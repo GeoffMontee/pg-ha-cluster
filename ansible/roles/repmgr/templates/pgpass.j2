@@ -1,0 +1,20 @@
+# PostgreSQL password file
+# hostname:port:database:username:password
+
+# Primary node
+{{ pg_primary_ip }}:5432:{{ repmgr_database }}:{{ repmgr_user }}:{{ repmgr_password }}
+{{ pg_primary_ip }}:5432:replication:{{ repmgr_user }}:{{ repmgr_password }}
+
+# Standby nodes
+{% for ip in pg_standby_ips %}
+{{ ip }}:5432:{{ repmgr_database }}:{{ repmgr_user }}:{{ repmgr_password }}
+{{ ip }}:5432:replication:{{ repmgr_user }}:{{ repmgr_password }}
+{% endfor %}
+
+# Local connections
+localhost:5432:*:{{ repmgr_user }}:{{ repmgr_password }}
+127.0.0.1:5432:*:{{ repmgr_user }}:{{ repmgr_password }}
+
+# Wildcard for cluster
+*:5432:{{ repmgr_database }}:{{ repmgr_user }}:{{ repmgr_password }}
+*:5432:replication:{{ repmgr_user }}:{{ repmgr_password }}

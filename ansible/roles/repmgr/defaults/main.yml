@@ -1,0 +1,18 @@
+---
+repmgr_version: "5.4"
+repmgr_cluster_name: "pg_ha_cluster"
+repmgr_database: "repmgr"
+repmgr_user: "repmgr"
+repmgr_config_dir: "/etc/repmgr"
+repmgr_log_dir: "/var/log/repmgr"
+
+# Failover settings
+repmgr_failover: "automatic"
+repmgr_promote_command: "/usr/bin/repmgr standby promote -f /etc/repmgr.conf --log-to-file"
+repmgr_follow_command: "/usr/bin/repmgr standby follow -f /etc/repmgr.conf --log-to-file --upstream-node-id=%n"
+repmgr_reconnect_attempts: 6
+repmgr_reconnect_interval: 10
+
+# Monitoring
+repmgr_monitoring_history: "yes"
+repmgr_monitor_interval_secs: 2

@@ -1,0 +1,19 @@
+[all:vars]
+ansible_user=${ssh_user}
+ansible_ssh_private_key_file={{ inventory_dir }}/${ssh_key_file}
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[pg_primary]
+pg-primary ansible_host=${pg_primary_ip} private_ip=${pg_primary_private_ip} node_id=1 node_priority=100
+
+[pg_standby]
+%{ for i, ip in pg_standby_ips ~}
+pg-standby-${i + 1} ansible_host=${ip} private_ip=${pg_standby_private_ips[i]} node_id=${i + 2} node_priority=${100 - (i + 1) * 10}
+%{ endfor ~}
+
+[pg_cluster:children]
+pg_primary
+pg_standby
+
+[haproxy]
+haproxy ansible_host=${haproxy_ip} private_ip=${haproxy_private_ip}

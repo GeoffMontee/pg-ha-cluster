@@ -1,0 +1,76 @@
+---
+# PostgreSQL HA Cluster Deployment Playbook
+# Deploys a 3-node PostgreSQL cluster with repmgr and HAProxy load balancer
+
+- name: Apply common configuration to all hosts
+  hosts: all
+  gather_facts: yes
+  become: true
+  roles:
+    - common
+  tags:
+    - common
+    - always
+
+- name: Install and configure PostgreSQL on cluster nodes
+  hosts: pg_cluster
+  gather_facts: yes
+  become: true
+  roles:
+    - postgresql
+  tags:
+    - postgresql
+
+- name: Configure repmgr for high availability
+  hosts: pg_cluster
+  gather_facts: yes
+  become: true
+  serial: 1  # Run one node at a time for proper replication setup
+  roles:
+    - repmgr
+  tags:
+    - repmgr
+
+- name: Deploy health check service on PostgreSQL nodes
+  hosts: pg_cluster
+  gather_facts: yes
+  become: true
+  roles:
+    - pg_healthcheck
+  tags:
+    - healthcheck
+
+- name: Install and configure HAProxy load balancer
+  hosts: haproxy
+  gather_facts: yes
+  become: true
+  roles:
+    - haproxy
+  tags:
+    - haproxy
+
+- name: Verify cluster deployment
+  hosts: pg_primary
+  gather_facts: no
+  become: true
+  tasks:
+    - name: Show repmgr cluster status
+      ansible.builtin.command: sudo -u postgres repmgr -f /etc/repmgr.conf cluster show
+      register: cluster_status
+      changed_when: false
+
+    - name: Display cluster status
+      ansible.builtin.debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+    - name: Verify replication is working
+      ansible.builtin.command: >
+        sudo -u postgres psql -c "SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn FROM pg_stat_replication;"
+      register: replication_status
+      changed_when: false
+
+    - name: Display replication status
+      ansible.builtin.debug:
+        msg: "{{ replication_status.stdout_lines }}"
+  tags:
+    - verify

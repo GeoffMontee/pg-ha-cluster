@@ -1,0 +1,70 @@
+---
+- name: Install HAProxy
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+  become: true
+
+- name: Install PostgreSQL client for health checks
+  ansible.builtin.apt:
+    name: postgresql-client
+    state: present
+  become: true
+
+- name: Create HAProxy health check script directory
+  ansible.builtin.file:
+    path: /etc/haproxy/scripts
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Deploy PostgreSQL health check script
+  ansible.builtin.template:
+    src: pg_check.sh.j2
+    dest: /etc/haproxy/scripts/pg_check.sh
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Configure HAProxy
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    validate: "haproxy -c -f %s"
+  become: true
+  notify: Restart HAProxy
+
+- name: Enable HAProxy service
+  ansible.builtin.systemd:
+    name: haproxy
+    enabled: yes
+  become: true
+
+- name: Start HAProxy service
+  ansible.builtin.systemd:
+    name: haproxy
+    state: started
+  become: true
+
+- name: Wait for HAProxy to be ready
+  ansible.builtin.wait_for:
+    port: "{{ haproxy_pg_rw_port }}"
+    host: localhost
+    timeout: 60
+
+- name: Verify HAProxy configuration
+  ansible.builtin.command: haproxy -c -f /etc/haproxy/haproxy.cfg
+  become: true
+  changed_when: false
+  register: haproxy_check
+
+- name: Display HAProxy verification result
+  ansible.builtin.debug:
+    msg: "HAProxy configuration is valid"
+  when: haproxy_check.rc == 0

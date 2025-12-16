@@ -1,0 +1,22 @@
+---
+haproxy_stats_port: 7000
+haproxy_stats_user: "admin"
+haproxy_stats_password: "{{ haproxy_stats_password }}"
+
+haproxy_pg_rw_port: 5432
+haproxy_pg_ro_port: 5433
+
+# Connection limits
+haproxy_maxconn_global: 4096
+haproxy_maxconn_frontend: 3000
+haproxy_maxconn_backend: 1000
+
+# Timeouts
+haproxy_timeout_connect: "10s"
+haproxy_timeout_client: "30m"
+haproxy_timeout_server: "30m"
+
+# Health check
+haproxy_health_check_interval: "5s"
+haproxy_health_check_fall: 3
+haproxy_health_check_rise: 2

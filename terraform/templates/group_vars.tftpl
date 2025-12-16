@@ -1,0 +1,29 @@
+---
+# PostgreSQL Configuration
+postgresql_version: "17"
+postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
+postgresql_config_dir: "/etc/postgresql/{{ postgresql_version }}/main"
+postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
+
+# Network Configuration
+pg_primary_ip: "${pg_primary_private_ip}"
+pg_standby_ips:
+%{ for ip in pg_standby_private_ips ~}
+  - "${ip}"
+%{ endfor ~}
+haproxy_ip: "${haproxy_private_ip}"
+
+# Passwords (use ansible-vault in production!)
+repmgr_password: "${repmgr_password}"
+postgres_password: "${postgres_password}"
+haproxy_stats_password: "${haproxy_stats_password}"
+
+# repmgr Configuration
+repmgr_cluster_name: "pg_ha_cluster"
+repmgr_database: "repmgr"
+repmgr_user: "repmgr"
+
+# HAProxy Configuration
+haproxy_stats_port: 7000
+haproxy_pg_rw_port: 5432
+haproxy_pg_ro_port: 5433

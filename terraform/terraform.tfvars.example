@@ -1,0 +1,22 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+aws_region     = "us-east-1"
+project_name   = "pg-ha-cluster"
+
+# Required by AWS policy
+owner = "your-name-or-email"
+
+# Restrict these in production!
+allowed_ssh_cidrs = ["YOUR_IP/32"]
+
+# Instance types
+pg_instance_type      = "t3.medium"
+haproxy_instance_type = "t3.small"
+
+# Storage
+pg_volume_size = 50
+
+# Passwords - use strong passwords in production!
+repmgr_password        = "repmgr_secure_password_here"
+postgres_password      = "postgres_secure_password_here"
+haproxy_stats_password = "haproxy_stats_password_here"

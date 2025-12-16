@@ -1,0 +1,37 @@
+---
+postgresql_version: "17"
+postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
+postgresql_config_dir: "/etc/postgresql/{{ postgresql_version }}/main"
+postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
+
+# repmgr defaults (used in pg_hba.conf template)
+repmgr_user: "repmgr"
+repmgr_database: "repmgr"
+
+# PostgreSQL settings
+postgresql_listen_addresses: "*"
+postgresql_port: 5432
+postgresql_max_connections: 200
+postgresql_shared_buffers: "256MB"
+postgresql_effective_cache_size: "768MB"
+postgresql_maintenance_work_mem: "64MB"
+postgresql_checkpoint_completion_target: 0.9
+postgresql_wal_buffers: "16MB"
+postgresql_default_statistics_target: 100
+postgresql_random_page_cost: 1.1
+postgresql_effective_io_concurrency: 200
+postgresql_work_mem: "4MB"
+postgresql_min_wal_size: "1GB"
+postgresql_max_wal_size: "4GB"
+
+# Replication settings
+postgresql_wal_level: "replica"
+postgresql_max_wal_senders: 10
+postgresql_max_replication_slots: 10
+postgresql_hot_standby: "on"
+postgresql_hot_standby_feedback: "on"
+postgresql_wal_log_hints: "on"
+
+# Archive settings (optional, for PITR)
+postgresql_archive_mode: "on"
+postgresql_archive_command: "/bin/true"

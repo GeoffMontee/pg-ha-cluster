@@ -1,0 +1,26 @@
+[Unit]
+Description=repmgr daemon
+Documentation=https://repmgr.org
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=postgres
+Group=postgres
+ExecStart=/usr/bin/repmgrd -f /etc/repmgr.conf --pid-file=/var/run/repmgr/repmgrd.pid
+ExecReload=/bin/kill -HUP $MAINPID
+PIDFile=/var/run/repmgr/repmgrd.pid
+RuntimeDirectory=repmgr
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ repmgr_log_dir }}
+ReadWritePaths=/var/run/repmgr
+
+[Install]
+WantedBy=multi-user.target

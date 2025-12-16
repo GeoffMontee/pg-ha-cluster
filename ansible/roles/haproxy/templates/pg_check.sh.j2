@@ -1,0 +1,52 @@
+#!/bin/bash
+# PostgreSQL Health Check Script for HAProxy
+# This script runs a simple HTTP server that returns node status
+
+# This script is deployed but HAProxy actually uses a separate health check service
+# See the pg_health_check role for the HTTP health check endpoint
+
+# For manual testing:
+# curl http://localhost:8008/primary - Returns 200 if primary, 503 if not
+# curl http://localhost:8008/replica - Returns 200 if can accept reads, 503 if not
+
+PGHOST="{{ private_ip }}"
+PGPORT=5432
+PGUSER="{{ repmgr_user }}"
+PGDATABASE="{{ repmgr_database }}"
+
+export PGPASSWORD="{{ repmgr_password }}"
+
+check_primary() {
+    result=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT pg_is_in_recovery();" 2>/dev/null)
+    if [[ "$result" =~ "f" ]]; then
+        echo "Primary"
+        return 0
+    else
+        echo "Not Primary"
+        return 1
+    fi
+}
+
+check_replica() {
+    result=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT 1;" 2>/dev/null)
+    if [[ "$result" =~ "1" ]]; then
+        echo "Available"
+        return 0
+    else
+        echo "Not Available"
+        return 1
+    fi
+}
+
+case "$1" in
+    primary)
+        check_primary
+        ;;
+    replica)
+        check_replica
+        ;;
+    *)
+        echo "Usage: $0 {primary|replica}"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,21 @@
+[Unit]
+Description=PostgreSQL Health Check HTTP Server
+Documentation=https://www.haproxy.com/blog/how-to-enable-health-checks-in-haproxy/
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=postgres
+Group=postgres
+ExecStart=/usr/bin/python3 /opt/pg-healthcheck/pg_healthcheck.py
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

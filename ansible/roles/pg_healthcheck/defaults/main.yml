@@ -1,0 +1,4 @@
+---
+pg_healthcheck_port: 8008
+pg_healthcheck_user: postgres
+pg_healthcheck_database: postgres

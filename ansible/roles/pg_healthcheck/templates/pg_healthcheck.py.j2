@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""
+PostgreSQL Health Check HTTP Server for HAProxy
+Provides endpoints to check if node is primary or replica
+"""
+
+import http.server
+import socketserver
+import json
+import sys
+import os
+
+# Add PostgreSQL library path
+sys.path.insert(0, '/usr/lib/python3/dist-packages')
+
+try:
+    import psycopg2
+except ImportError:
+    print("ERROR: psycopg2 not found. Install with: apt install python3-psycopg2")
+    sys.exit(1)
+
+PORT = {{ pg_healthcheck_port }}
+DB_HOST = None  # Use Unix socket for peer authentication
+DB_PORT = 5432
+DB_NAME = "{{ pg_healthcheck_database }}"
+DB_USER = "{{ pg_healthcheck_user }}"
+
+
+def get_db_connection():
+    """Get a database connection using peer authentication via Unix socket."""
+    try:
+        conn = psycopg2.connect(
+            database=DB_NAME,
+            user=DB_USER,
+            connect_timeout=5
+        )
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+
+def is_primary():
+    """Check if this node is the primary (not in recovery)."""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT NOT pg_is_in_recovery();")
+        result = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"Query error: {e}")
+        return None
+
+
+def is_replica():
+    """Check if this node is available for read queries."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        result = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return result == 1
+    except Exception as e:
+        print(f"Query error: {e}")
+        return False
+
+
+def get_replication_info():
+    """Get detailed replication information."""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cur = conn.cursor()
+        
+        # Check if primary or standby
+        cur.execute("SELECT pg_is_in_recovery();")
+        is_in_recovery = cur.fetchone()[0]
+        
+        info = {
+            "is_in_recovery": is_in_recovery,
+            "role": "standby" if is_in_recovery else "primary"
+        }
+        
+        if is_in_recovery:
+            # Standby specific info
+            cur.execute("""
+                SELECT 
+                    pg_last_wal_receive_lsn(),
+                    pg_last_wal_replay_lsn(),
+                    pg_last_xact_replay_timestamp()
+            """)
+            row = cur.fetchone()
+            info["last_wal_receive_lsn"] = str(row[0]) if row[0] else None
+            info["last_wal_replay_lsn"] = str(row[1]) if row[1] else None
+            info["last_replay_timestamp"] = str(row[2]) if row[2] else None
+        else:
+            # Primary specific info
+            cur.execute("""
+                SELECT 
+                    pg_current_wal_lsn(),
+                    (SELECT count(*) FROM pg_stat_replication)
+            """)
+            row = cur.fetchone()
+            info["current_wal_lsn"] = str(row[0]) if row[0] else None
+            info["connected_standbys"] = row[1]
+        
+        cur.close()
+        conn.close()
+        return info
+    except Exception as e:
+        print(f"Query error: {e}")
+        return None
+
+
+class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
+    """HTTP request handler for health check endpoints."""
+    
+    def log_message(self, format, *args):
+        """Suppress default logging."""
+        pass
+    
+    def send_json_response(self, status_code, data):
+        """Send a JSON response."""
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
+    
+    def do_GET(self):
+        """Handle GET requests."""
+        
+        if self.path == '/primary':
+            # HAProxy uses this to find the primary for read-write traffic
+            result = is_primary()
+            if result is True:
+                self.send_json_response(200, {"status": "ok", "role": "primary"})
+            elif result is False:
+                self.send_json_response(503, {"status": "error", "role": "standby"})
+            else:
+                self.send_json_response(503, {"status": "error", "message": "cannot connect"})
+        
+        elif self.path == '/replica':
+            # HAProxy uses this for read-only traffic (any available node)
+            if is_replica():
+                self.send_json_response(200, {"status": "ok", "available": True})
+            else:
+                self.send_json_response(503, {"status": "error", "available": False})
+        
+        elif self.path == '/health':
+            # General health check
+            info = get_replication_info()
+            if info:
+                self.send_json_response(200, {"status": "ok", **info})
+            else:
+                self.send_json_response(503, {"status": "error", "message": "cannot get info"})
+        
+        elif self.path == '/':
+            # Root endpoint - basic info
+            self.send_json_response(200, {
+                "service": "pg-healthcheck",
+                "endpoints": ["/primary", "/replica", "/health"]
+            })
+        
+        else:
+            self.send_json_response(404, {"error": "not found"})
+
+
+def main():
+    """Run the health check server."""
+    # Allow socket reuse
+    socketserver.TCPServer.allow_reuse_address = True
+    
+    with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
+        print(f"PostgreSQL Health Check Server running on port {PORT}")
+        print(f"Endpoints: /primary, /replica, /health")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            httpd.shutdown()
+
+
+if __name__ == "__main__":
+    main()

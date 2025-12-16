@@ -1,0 +1,145 @@
+---
+- name: Install repmgr for PostgreSQL {{ postgresql_version }}
+  ansible.builtin.apt:
+    name: "postgresql-{{ postgresql_version }}-repmgr"
+    state: present
+  become: true
+
+- name: Enable repmgr in shared_preload_libraries
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_config_dir }}/postgresql.conf"
+    regexp: '^#?\s*shared_preload_libraries\s*='
+    line: "shared_preload_libraries = 'repmgr'"
+    state: present
+  become: true
+  notify: Restart PostgreSQL
+
+- name: Flush handlers to restart PostgreSQL with repmgr loaded
+  ansible.builtin.meta: flush_handlers
+
+- name: Create repmgr config directory
+  ansible.builtin.file:
+    path: "{{ repmgr_config_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0755'
+  become: true
+
+- name: Create repmgr log directory
+  ansible.builtin.file:
+    path: "{{ repmgr_log_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0755'
+  become: true
+
+- name: Configure repmgr.conf
+  ansible.builtin.template:
+    src: repmgr.conf.j2
+    dest: /etc/repmgr.conf
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  become: true
+
+- name: Create .pgpass file for postgres user
+  ansible.builtin.template:
+    src: pgpass.j2
+    dest: /var/lib/postgresql/.pgpass
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  become: true
+
+- name: Configure repmgrd systemd service
+  ansible.builtin.template:
+    src: repmgrd.service.j2
+    dest: /etc/systemd/system/repmgrd.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: Reload systemd
+
+# Primary node setup
+- name: Register primary node
+  ansible.builtin.command: >
+    sudo -u postgres repmgr -f /etc/repmgr.conf primary register --force
+  become: true
+  when: inventory_hostname in groups['pg_primary']
+  register: primary_register
+  changed_when: "'registered as primary' in primary_register.stdout or 'already registered' in primary_register.stderr"
+  failed_when: false
+
+# Standby node setup
+- name: Stop PostgreSQL on standby nodes for cloning
+  ansible.builtin.systemd:
+    name: postgresql
+    state: stopped
+  become: true
+  when: inventory_hostname in groups['pg_standby']
+
+- name: Remove existing data directory on standby
+  ansible.builtin.file:
+    path: "{{ postgresql_data_dir }}"
+    state: absent
+  become: true
+  when: inventory_hostname in groups['pg_standby']
+
+- name: Clone standby from primary
+  ansible.builtin.command: >
+    sudo -u postgres repmgr -h {{ pg_primary_ip }} -U {{ repmgr_user }} -d {{ repmgr_database }}
+    -f /etc/repmgr.conf standby clone --fast-checkpoint
+  become: true
+  environment:
+    PGPASSWORD: "{{ repmgr_password }}"
+  when: inventory_hostname in groups['pg_standby']
+  register: clone_result
+  changed_when: true
+
+- name: Start PostgreSQL on standby nodes
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+  become: true
+  when: inventory_hostname in groups['pg_standby']
+
+- name: Wait for PostgreSQL to be ready on standby
+  ansible.builtin.wait_for:
+    port: 5432
+    host: localhost
+    timeout: 60
+  when: inventory_hostname in groups['pg_standby']
+
+- name: Register standby nodes
+  ansible.builtin.command: >
+    sudo -u postgres repmgr -f /etc/repmgr.conf standby register --force
+  become: true
+  when: inventory_hostname in groups['pg_standby']
+  register: standby_register
+  changed_when: "'registered as standby' in standby_register.stdout"
+  failed_when: false
+
+# Enable and start repmgrd daemon
+- name: Enable and start repmgrd service
+  ansible.builtin.systemd:
+    name: repmgrd
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+
+- name: Verify cluster status
+  ansible.builtin.command: >
+    sudo -u postgres repmgr -f /etc/repmgr.conf cluster show
+  become: true
+  register: cluster_status
+  changed_when: false
+  when: inventory_hostname in groups['pg_primary']
+
+- name: Display cluster status
+  ansible.builtin.debug:
+    var: cluster_status.stdout_lines
+  when: inventory_hostname in groups['pg_primary']
