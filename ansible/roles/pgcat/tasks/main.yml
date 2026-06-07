@@ -1,0 +1,77 @@
+---
+- name: Install PgCat build dependencies
+  ansible.builtin.apt:
+    name:
+      - cargo
+      - build-essential
+      - pkg-config
+      - libssl-dev
+    state: present
+  become: true
+
+- name: Install PgCat with Cargo
+  ansible.builtin.command: cargo install {{ pgcat_package }} --root /usr/local
+  args:
+    creates: "{{ pgcat_binary }}"
+  environment:
+    CARGO_HOME: /usr/local/share/cargo
+  become: true
+
+- name: Create PgCat group
+  ansible.builtin.group:
+    name: "{{ pgcat_group }}"
+    system: yes
+  become: true
+
+- name: Create PgCat user
+  ansible.builtin.user:
+    name: "{{ pgcat_user }}"
+    group: "{{ pgcat_group }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    home: /var/lib/pgcat
+    create_home: yes
+  become: true
+
+- name: Create PgCat config directory
+  ansible.builtin.file:
+    path: "{{ pgcat_config_dir }}"
+    state: directory
+    owner: "{{ pgcat_user }}"
+    group: "{{ pgcat_group }}"
+    mode: '0750'
+  become: true
+
+- name: Configure PgCat
+  ansible.builtin.template:
+    src: pgcat.toml.j2
+    dest: "{{ pgcat_config_file }}"
+    owner: "{{ pgcat_user }}"
+    group: "{{ pgcat_group }}"
+    mode: '0640'
+  become: true
+  notify: Restart pgcat
+
+- name: Configure PgCat systemd service
+  ansible.builtin.template:
+    src: pgcat.service.j2
+    dest: /etc/systemd/system/{{ pgcat_service }}.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: Restart pgcat
+
+- name: Enable and start PgCat
+  ansible.builtin.systemd:
+    name: "{{ pgcat_service }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: true
+
+- name: Wait for PgCat to be ready
+  ansible.builtin.wait_for:
+    port: "{{ pgcat_port }}"
+    host: localhost
+    timeout: 60

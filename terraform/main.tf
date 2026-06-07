@@ -34,11 +34,31 @@ locals {
   deploy_aws = var.cloud_provider == "aws"
   deploy_gcp = var.cloud_provider == "gcp"
 
-  default_pg_instance_type      = local.deploy_aws ? "i7ie.4xlarge" : "c4d-standard-16"
-  default_haproxy_instance_type = local.deploy_aws ? "c7i.4xlarge" : "c4-standard-16"
+  default_pg_instance_type    = local.deploy_aws ? "i7ie.4xlarge" : "c4d-standard-16"
+  default_proxy_instance_type = local.deploy_aws ? "c7i.4xlarge" : "c4-standard-16"
 
-  pg_instance_type      = coalesce(var.pg_instance_type, local.default_pg_instance_type)
-  haproxy_instance_type = coalesce(var.haproxy_instance_type, local.default_haproxy_instance_type)
+  pg_instance_type    = coalesce(var.pg_instance_type, local.default_pg_instance_type)
+  proxy_instance_type = coalesce(var.proxy_instance_type, local.default_proxy_instance_type)
+
+  proxy_client_ports_by_type = {
+    haproxy  = [5432, 5433]
+    pgpool   = [5432]
+    proxysql = [5432]
+    pgcat    = [5432]
+  }
+  proxy_admin_ports_by_type = {
+    haproxy  = [7000]
+    pgpool   = [9898]
+    proxysql = [6032]
+    pgcat    = [9930]
+  }
+  proxy_allowed_ports = toset(concat(
+    local.proxy_client_ports_by_type[var.proxy_type],
+    local.proxy_admin_ports_by_type[var.proxy_type],
+  ))
+  proxy_pg_rw_port = local.proxy_client_ports_by_type[var.proxy_type][0]
+  proxy_pg_ro_port = var.proxy_type == "haproxy" ? 5433 : 0
+  proxy_admin_port = local.proxy_admin_ports_by_type[var.proxy_type][0]
 
   common_tags = var.owner == "" ? {} : {
     Owner = var.owner
@@ -52,7 +72,7 @@ locals {
   aws_subnet_id = var.create_network ? try(aws_subnet.public[0].id, "") : var.existing_subnet_id
 
   gcp_pg_tag        = "${var.project_name}-pg"
-  gcp_haproxy_tag   = "${var.project_name}-haproxy"
+  gcp_proxy_tag     = "${var.project_name}-proxy"
   gcp_network       = var.create_network ? try(google_compute_network.pg_cluster[0].self_link, "") : var.existing_gcp_network
   gcp_subnetwork    = var.create_network ? try(google_compute_subnetwork.public[0].self_link, "") : var.existing_gcp_subnetwork
   gcp_machine_image = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
@@ -68,9 +88,9 @@ locals {
   pg_standby_private_ips = local.deploy_aws ? aws_instance.pg_standby[*].private_ip : [
     for instance in google_compute_instance.pg_standby : instance.network_interface[0].network_ip
   ]
-  haproxy_public_ip = local.deploy_aws ? try(aws_instance.haproxy[0].public_ip, "") : try(google_compute_instance.haproxy[0].network_interface[0].access_config[0].nat_ip, "")
-  haproxy_private_ip = local.deploy_aws ? try(aws_instance.haproxy[0].private_ip, "") : try(
-    google_compute_instance.haproxy[0].network_interface[0].network_ip,
+  proxy_public_ip = local.deploy_aws ? try(aws_instance.proxy[0].public_ip, "") : try(google_compute_instance.proxy[0].network_interface[0].access_config[0].nat_ip, "")
+  proxy_private_ip = local.deploy_aws ? try(aws_instance.proxy[0].private_ip, "") : try(
+    google_compute_instance.proxy[0].network_interface[0].network_ip,
     ""
   )
 }
@@ -194,10 +214,10 @@ resource "aws_security_group" "postgresql" {
   }, local.common_tags)
 }
 
-resource "aws_security_group" "haproxy" {
+resource "aws_security_group" "proxy" {
   count       = local.deploy_aws ? 1 : 0
-  name        = "${var.project_name}-haproxy-sg"
-  description = "Security group for HAProxy load balancer"
+  name        = "${var.project_name}-proxy-sg"
+  description = "Security group for PostgreSQL proxy"
   vpc_id      = local.aws_vpc_id
 
   ingress {
@@ -208,28 +228,15 @@ resource "aws_security_group" "haproxy" {
     description = "SSH access"
   }
 
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs
-    description = "PostgreSQL read-write port"
-  }
-
-  ingress {
-    from_port   = 5433
-    to_port     = 5433
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs
-    description = "PostgreSQL read-only port"
-  }
-
-  ingress {
-    from_port   = 7000
-    to_port     = 7000
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs
-    description = "HAProxy stats"
+  dynamic "ingress" {
+    for_each = local.proxy_allowed_ports
+    content {
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_ssh_cidrs
+      description = "PostgreSQL proxy port ${ingress.value}"
+    }
   }
 
   egress {
@@ -241,7 +248,7 @@ resource "aws_security_group" "haproxy" {
   }
 
   tags = merge({
-    Name = "${var.project_name}-haproxy-sg"
+    Name = "${var.project_name}-proxy-sg"
   }, local.common_tags)
 }
 
@@ -270,7 +277,7 @@ resource "google_compute_firewall" "ssh" {
   }
 
   source_ranges = var.allowed_ssh_cidrs
-  target_tags   = [local.gcp_pg_tag, local.gcp_haproxy_tag]
+  target_tags   = [local.gcp_pg_tag, local.gcp_proxy_tag]
 }
 
 resource "google_compute_firewall" "postgresql_internal" {
@@ -283,7 +290,7 @@ resource "google_compute_firewall" "postgresql_internal" {
   }
 
   source_ranges = [var.vpc_cidr]
-  target_tags   = [local.gcp_pg_tag, local.gcp_haproxy_tag]
+  target_tags   = [local.gcp_pg_tag, local.gcp_proxy_tag]
 }
 
 resource "google_compute_firewall" "postgresql_external" {
@@ -300,18 +307,18 @@ resource "google_compute_firewall" "postgresql_external" {
   target_tags   = [local.gcp_pg_tag]
 }
 
-resource "google_compute_firewall" "haproxy" {
+resource "google_compute_firewall" "proxy" {
   count   = local.deploy_gcp ? 1 : 0
-  name    = "${var.project_name}-haproxy"
+  name    = "${var.project_name}-proxy"
   network = local.gcp_network
 
   allow {
     protocol = "tcp"
-    ports    = ["5432", "5433", "7000"]
+    ports    = [for port in local.proxy_allowed_ports : tostring(port)]
   }
 
   source_ranges = var.allowed_ssh_cidrs
-  target_tags   = [local.gcp_haproxy_tag]
+  target_tags   = [local.gcp_proxy_tag]
 }
 
 resource "tls_private_key" "ssh" {
@@ -375,13 +382,13 @@ resource "aws_instance" "pg_standby" {
   }, local.common_tags)
 }
 
-resource "aws_instance" "haproxy" {
+resource "aws_instance" "proxy" {
   count                  = local.deploy_aws ? 1 : 0
   ami                    = data.aws_ami.ubuntu[0].id
-  instance_type          = local.haproxy_instance_type
+  instance_type          = local.proxy_instance_type
   key_name               = aws_key_pair.pg_cluster[0].key_name
   subnet_id              = local.aws_subnet_id
-  vpc_security_group_ids = [aws_security_group.haproxy[0].id, aws_security_group.postgresql[0].id]
+  vpc_security_group_ids = [aws_security_group.proxy[0].id, aws_security_group.postgresql[0].id]
 
   root_block_device {
     volume_size = 20
@@ -390,8 +397,9 @@ resource "aws_instance" "haproxy" {
   }
 
   tags = merge({
-    Name = "${var.project_name}-haproxy"
-    Role = "loadbalancer"
+    Name = "${var.project_name}-proxy"
+    Role = "proxy"
+    Type = var.proxy_type
   }, local.common_tags)
 }
 
@@ -465,13 +473,13 @@ resource "google_compute_instance" "pg_standby" {
   }
 }
 
-resource "google_compute_instance" "haproxy" {
+resource "google_compute_instance" "proxy" {
   count        = local.deploy_gcp ? 1 : 0
-  name         = "${var.project_name}-haproxy"
-  machine_type = local.haproxy_instance_type
+  name         = "${var.project_name}-proxy"
+  machine_type = local.proxy_instance_type
   zone         = var.gcp_zone
-  tags         = [local.gcp_haproxy_tag, local.gcp_pg_tag]
-  labels       = merge({ role = "loadbalancer" }, local.common_labels)
+  tags         = [local.gcp_proxy_tag, local.gcp_pg_tag]
+  labels       = merge({ role = "proxy", type = var.proxy_type }, local.common_labels)
 
   boot_disk {
     initialize_params {
@@ -499,8 +507,8 @@ resource "local_file" "ansible_inventory" {
     pg_primary_private_ip  = local.pg_primary_private_ip
     pg_standby_ips         = local.pg_standby_public_ips
     pg_standby_private_ips = local.pg_standby_private_ips
-    haproxy_ip             = local.haproxy_public_ip
-    haproxy_private_ip     = local.haproxy_private_ip
+    proxy_ip               = local.proxy_public_ip
+    proxy_private_ip       = local.proxy_private_ip
     ssh_key_file           = "${var.project_name}-key.pem"
     ssh_user               = "ubuntu"
   })
@@ -511,14 +519,18 @@ resource "local_file" "ansible_group_vars" {
   content = templatefile("${path.module}/templates/group_vars.tftpl", {
     cloud_provider         = var.cloud_provider
     vpc_cidr               = var.vpc_cidr
+    proxy_type             = var.proxy_type
+    proxy_pg_rw_port       = local.proxy_pg_rw_port
+    proxy_pg_ro_port       = local.proxy_pg_ro_port
+    proxy_admin_port       = local.proxy_admin_port
     postgresql_version     = var.postgresql_version
     pg_primary_private_ip  = local.pg_primary_private_ip
     pg_standby_private_ips = local.pg_standby_private_ips
-    haproxy_private_ip     = local.haproxy_private_ip
+    proxy_private_ip       = local.proxy_private_ip
     enable_local_nvme      = var.enable_local_nvme
     repmgr_password        = var.repmgr_password
     postgres_password      = var.postgres_password
-    haproxy_stats_password = var.haproxy_stats_password
+    proxy_admin_password   = var.proxy_admin_password
   })
   filename = "${path.module}/../ansible/inventory/group_vars/all.yml"
 }

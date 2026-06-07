@@ -99,8 +99,19 @@ variable "pg_instance_type" {
   default     = null
 }
 
-variable "haproxy_instance_type" {
-  description = "Instance or machine type for the HAProxy node. Defaults are cloud-specific."
+variable "proxy_type" {
+  description = "PostgreSQL proxy implementation. Valid values are haproxy, pgpool, proxysql, or pgcat."
+  type        = string
+  default     = "haproxy"
+
+  validation {
+    condition     = contains(["haproxy", "pgpool", "proxysql", "pgcat"], var.proxy_type)
+    error_message = "proxy_type must be one of haproxy, pgpool, proxysql, or pgcat."
+  }
+}
+
+variable "proxy_instance_type" {
+  description = "Instance or machine type for the proxy node. Defaults are cloud-specific."
   type        = string
   default     = null
 }
@@ -141,8 +152,8 @@ variable "postgres_password" {
   sensitive   = true
 }
 
-variable "haproxy_stats_password" {
-  description = "Password for HAProxy stats page"
+variable "proxy_admin_password" {
+  description = "Password for proxy administration endpoints"
   type        = string
   sensitive   = true
 }

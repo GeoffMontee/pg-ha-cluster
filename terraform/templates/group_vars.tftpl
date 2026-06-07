@@ -8,12 +8,13 @@ postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
 # Network Configuration
 cloud_provider: "${cloud_provider}"
 vpc_cidr: "${vpc_cidr}"
+proxy_type: "${proxy_type}"
 pg_primary_ip: "${pg_primary_private_ip}"
 pg_standby_ips:
 %{ for ip in pg_standby_private_ips ~}
   - "${ip}"
 %{ endfor ~}
-haproxy_ip: "${haproxy_private_ip}"
+proxy_ip: "${proxy_private_ip}"
 
 # Local NVMe storage. Terraform selects instance types with local NVMe by default;
 # Ansible discovers and mounts the first non-root NVMe disk on database nodes.
@@ -24,14 +25,14 @@ local_nvme_filesystem: "xfs"
 # Passwords (use ansible-vault in production!)
 repmgr_password: "${repmgr_password}"
 postgres_password: "${postgres_password}"
-haproxy_stats_password: "${haproxy_stats_password}"
+proxy_admin_password: "${proxy_admin_password}"
 
 # repmgr Configuration
 repmgr_cluster_name: "pg_ha_cluster"
 repmgr_database: "repmgr"
 repmgr_user: "repmgr"
 
-# HAProxy Configuration
-haproxy_stats_port: 7000
-haproxy_pg_rw_port: 5432
-haproxy_pg_ro_port: 5433
+# Proxy Configuration
+proxy_pg_rw_port: ${proxy_pg_rw_port}
+proxy_pg_ro_port: ${proxy_pg_ro_port}
+proxy_admin_port: ${proxy_admin_port}

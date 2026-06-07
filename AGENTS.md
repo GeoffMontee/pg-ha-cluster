@@ -26,4 +26,5 @@
 - `show` should display Terraform outputs and only attempt Ansible cluster status when inventory exists, unless status is skipped.
 - `destroy` should destroy only Terraform-managed infrastructure and should not run Ansible.
 - Keep cloud-specific behavior behind provider arguments and generated Terraform variables; avoid hardcoding AWS-only or GCP-only assumptions into shared paths.
+- Keep proxy behavior generic in shared paths. Proxy-specific behavior belongs in `ansible/roles/haproxy`, `ansible/roles/pgpool`, `ansible/roles/proxysql`, or `ansible/roles/pgcat`.
 - When adding subcommand options, prefer explicit flags and test their generated config or command behavior.

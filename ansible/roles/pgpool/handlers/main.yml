@@ -1,0 +1,6 @@
+---
+- name: Restart pgpool
+  ansible.builtin.systemd:
+    name: "{{ pgpool_service }}"
+    state: restarted
+  become: true

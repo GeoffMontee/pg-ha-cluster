@@ -15,5 +15,5 @@ pg-standby-${i + 1} ansible_host=${ip} private_ip=${pg_standby_private_ips[i]} n
 pg_primary
 pg_standby
 
-[haproxy]
-haproxy ansible_host=${haproxy_ip} private_ip=${haproxy_private_ip}
+[proxy]
+proxy ansible_host=${proxy_ip} private_ip=${proxy_private_ip}

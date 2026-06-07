@@ -1,0 +1,9 @@
+---
+proxysql_package: "proxysql"
+proxysql_service: "proxysql"
+proxysql_config_file: "/etc/proxysql.cnf"
+proxysql_admin_user: "admin"
+proxysql_admin_port: "{{ proxy_admin_port | default(6032) }}"
+proxysql_pg_port: "{{ proxy_pg_rw_port | default(5432) }}"
+proxysql_primary_hostgroup: 10
+proxysql_replica_hostgroup: 20

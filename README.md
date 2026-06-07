@@ -3,18 +3,17 @@
 This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP using:
 
 - **Terraform** for cloud infrastructure, VPC/networking, firewall rules/security groups, instances, SSH keys, and generated Ansible inventory.
-- **Ansible** for PostgreSQL, repmgr, health checks, and HAProxy configuration.
+- **Ansible** for PostgreSQL, repmgr, health checks, and proxy configuration.
 - **repmgr** for replication and automatic failover.
-- **HAProxy** for read/write and read-only PostgreSQL endpoints.
+- **HAProxy, pgpool-II, ProxySQL, or PgCat** as the PostgreSQL proxy.
 
 ## Architecture
 
 ```
                     ┌─────────────────────────────────────────┐
-                    │            HAProxy (proxy)              │
-                    │  Port 5432 (R/W) → Primary              │
-                    │  Port 5433 (R/O) → All nodes            │
-                    │  Port 7000 (Stats)                      │
+                    │          PostgreSQL Proxy               │
+                    │  HAProxy | pgpool-II | ProxySQL | PgCat │
+                    │  Port 5432 → PostgreSQL                 │
                     └─────────────────┬───────────────────────┘
                                       │
               ┌───────────────────────┼───────────────────────┐
@@ -107,8 +106,9 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--subnet-cidr CIDR`: CIDR for the created public subnet/subnetwork. Defaults to `10.0.1.0/24`.
 - `--existing-vpc ID_OR_SELF_LINK`: Existing AWS VPC ID or GCP VPC network name/self link. Must be used with `--existing-subnet`.
 - `--existing-subnet ID_OR_SELF_LINK`: Existing AWS subnet ID or GCP subnetwork name/self link. Must be used with `--existing-vpc`.
+- `--proxy-type {haproxy,pgpool,proxysql,pgcat}`: PostgreSQL proxy implementation. Defaults to `haproxy`.
 - `--pg-instance-type TYPE`: PostgreSQL node instance or machine type. Defaults are cloud-specific.
-- `--proxy-instance-type TYPE`: HAProxy proxy instance or machine type. Defaults are cloud-specific.
+- `--proxy-instance-type TYPE`: Proxy node instance or machine type. Defaults are cloud-specific.
 - `--postgres-version VERSION`: PostgreSQL major version to install. Defaults to `18`.
 - `--pg-volume-size GB`: Root volume size for PostgreSQL nodes. Defaults to `50`.
 - `--no-local-nvme`: Disable local NVMe/local SSD mounting for PostgreSQL data.
@@ -119,7 +119,7 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--gcp-pg-local-ssd-count COUNT`: Number of local SSD scratch disks per GCP PostgreSQL node. Defaults to `1`.
 - `--repmgr-password PASSWORD`: repmgr password. Defaults to `PG_HA_REPMGR_PASSWORD` or a generated value.
 - `--postgres-password PASSWORD`: postgres superuser password. Defaults to `PG_HA_POSTGRES_PASSWORD` or a generated value.
-- `--haproxy-stats-password PASSWORD`: HAProxy stats password. Defaults to `PG_HA_HAPROXY_STATS_PASSWORD` or a generated value.
+- `--proxy-admin-password PASSWORD`: Proxy administration password. Defaults to `PG_HA_PROXY_ADMIN_PASSWORD` or a generated value.
 - `--skip-ansible`: Run Terraform only.
 - `--skip-galaxy`: Skip Ansible Galaxy collection installation.
 - `--no-auto-approve`: Prompt before `terraform apply`.
@@ -134,18 +134,18 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 
 ## Cloud Defaults
 
-By default, the Terraform configuration creates a VPC/network, a public subnet/subnetwork, firewall rules/security groups, three PostgreSQL nodes, and one HAProxy proxy node.
+By default, the Terraform configuration creates a VPC/network, a public subnet/subnetwork, firewall rules/security groups, three PostgreSQL nodes, and one proxy node.
 
 AWS defaults:
 
 - PostgreSQL nodes: `i7ie.4xlarge`
-- HAProxy proxy node: `c7i.4xlarge`
+- Proxy node: `c7i.4xlarge`
 - PostgreSQL data: local NVMe instance store mounted at `/var/lib/postgresql`
 
 GCP defaults:
 
 - PostgreSQL nodes: `c4d-standard-16`
-- HAProxy proxy node: `c4-standard-16`
+- Proxy node: `c4-standard-16`
 - PostgreSQL data: one local SSD scratch disk per database node, mounted at `/var/lib/postgresql`
 
 Override instance types with:
@@ -156,6 +156,21 @@ python3 deploy_pg_ha_cluster.py deploy \
   --pg-instance-type i7ie.8xlarge \
   --proxy-instance-type c7i.8xlarge
 ```
+
+Select a proxy implementation with:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy --provider aws --proxy-type pgcat
+```
+
+Proxy-specific exposed ports:
+
+- `haproxy`: PostgreSQL read/write on `5432`, read-only on `5433`, stats on `7000`.
+- `pgpool`: PostgreSQL proxy on `5432`, PCP admin on `9898`.
+- `proxysql`: PostgreSQL proxy on `5432`, admin interface on `6032`.
+- `pgcat`: PostgreSQL proxy on `5432`, Prometheus/admin endpoint on `9930`.
+
+ProxySQL is installed from the target host's configured apt repositories. PgCat is installed with Cargo by the `pgcat` role.
 
 Disable the local NVMe mount if you choose an instance type without local NVMe storage:
 
@@ -225,11 +240,10 @@ After deployment, use:
 python3 deploy_pg_ha_cluster.py show
 ```
 
-HAProxy exposes:
+The selected proxy exposes:
 
-- Port `5432` for read/write PostgreSQL connections to the current primary.
-- Port `5433` for read-only PostgreSQL connections across readable nodes.
-- Port `7000` for the HAProxy stats dashboard at `http://<haproxy-ip>:7000/stats`.
+- Port `5432` for PostgreSQL client connections.
+- Optional proxy-specific read-only or admin ports listed in the proxy defaults above.
 
 ## Operations
 
@@ -287,7 +301,10 @@ pg-ha-cluster/
         ├── postgresql/
         ├── repmgr/
         ├── pg_healthcheck/
-        └── haproxy/
+        ├── haproxy/
+        ├── pgpool/
+        ├── proxysql/
+        └── pgcat/
 ```
 
 ## Security Notes

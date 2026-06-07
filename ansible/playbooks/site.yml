@@ -1,6 +1,6 @@
 ---
 # PostgreSQL HA Cluster Deployment Playbook
-# Deploys a 3-node PostgreSQL cluster with repmgr and HAProxy load balancer
+# Deploys a 3-node PostgreSQL cluster with repmgr and a configurable proxy
 
 - name: Apply common configuration to all hosts
   hosts: all
@@ -40,14 +40,21 @@
   tags:
     - healthcheck
 
-- name: Install and configure HAProxy load balancer
-  hosts: haproxy
+- name: Install and configure PostgreSQL proxy
+  hosts: proxy
   gather_facts: yes
   become: true
   roles:
-    - haproxy
+    - role: haproxy
+      when: proxy_type == 'haproxy'
+    - role: pgpool
+      when: proxy_type == 'pgpool'
+    - role: proxysql
+      when: proxy_type == 'proxysql'
+    - role: pgcat
+      when: proxy_type == 'pgcat'
   tags:
-    - haproxy
+    - proxy
 
 - name: Verify cluster deployment
   hosts: pg_primary

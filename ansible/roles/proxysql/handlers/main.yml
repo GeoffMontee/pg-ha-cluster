@@ -1,0 +1,6 @@
+---
+- name: Restart proxysql
+  ansible.builtin.systemd:
+    name: "{{ proxysql_service }}"
+    state: restarted
+  become: true

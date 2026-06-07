@@ -1,0 +1,12 @@
+---
+pgcat_user: "pgcat"
+pgcat_group: "pgcat"
+pgcat_package: "pgcat"
+pgcat_config_dir: "/etc/pgcat"
+pgcat_config_file: "{{ pgcat_config_dir }}/pgcat.toml"
+pgcat_binary: "/usr/local/bin/pgcat"
+pgcat_service: "pgcat"
+pgcat_listen_address: "0.0.0.0"
+pgcat_port: "{{ proxy_pg_rw_port | default(5432) }}"
+pgcat_admin_port: "{{ proxy_admin_port | default(9930) }}"
+pgcat_pool_mode: "transaction"

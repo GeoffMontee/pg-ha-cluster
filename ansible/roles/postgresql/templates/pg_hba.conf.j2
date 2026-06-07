@@ -30,8 +30,8 @@ host    {{ repmgr_database }}    {{ repmgr_user }}    {{ pg_primary_ip }}/32    
 host    {{ repmgr_database }}    {{ repmgr_user }}    {{ ip }}/32                    scram-sha-256
 {% endfor %}
 
-# HAProxy health check access
-host    all             all             {{ haproxy_ip }}/32             scram-sha-256
+# Proxy health check and client access
+host    all             all             {{ proxy_ip }}/32             scram-sha-256
 
 # VPC-wide access (adjust for production!)
 host    all             all             {{ vpc_cidr }}             scram-sha-256

@@ -1,0 +1,7 @@
+---
+- name: Restart pgcat
+  ansible.builtin.systemd:
+    name: "{{ pgcat_service }}"
+    state: restarted
+    daemon_reload: yes
+  become: true

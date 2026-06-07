@@ -1,0 +1,49 @@
+---
+- name: Install pgpool-II
+  ansible.builtin.apt:
+    name: "{{ pgpool_package }}"
+    state: present
+  become: true
+
+- name: Configure pgpool-II
+  ansible.builtin.template:
+    src: pgpool.conf.j2
+    dest: "{{ pgpool_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  notify: Restart pgpool
+
+- name: Configure pgpool-II client authentication
+  ansible.builtin.template:
+    src: pool_hba.conf.j2
+    dest: "{{ pgpool_pool_hba_file }}"
+    owner: root
+    group: root
+    mode: '0640'
+  become: true
+  notify: Restart pgpool
+
+- name: Configure pgpool-II PCP authentication
+  ansible.builtin.template:
+    src: pcp.conf.j2
+    dest: "{{ pgpool_pcp_file }}"
+    owner: root
+    group: root
+    mode: '0640'
+  become: true
+  notify: Restart pgpool
+
+- name: Enable and start pgpool-II
+  ansible.builtin.systemd:
+    name: "{{ pgpool_service }}"
+    state: started
+    enabled: yes
+  become: true
+
+- name: Wait for pgpool-II to be ready
+  ansible.builtin.wait_for:
+    port: "{{ pgpool_port }}"
+    host: localhost
+    timeout: 60

@@ -1,10 +1,10 @@
 ---
-haproxy_stats_port: 7000
+haproxy_stats_port: "{{ proxy_admin_port | default(7000) }}"
 haproxy_stats_user: "admin"
-haproxy_stats_password: "{{ haproxy_stats_password }}"
+haproxy_stats_password: "{{ proxy_admin_password }}"
 
-haproxy_pg_rw_port: 5432
-haproxy_pg_ro_port: 5433
+haproxy_pg_rw_port: "{{ proxy_pg_rw_port | default(5432) }}"
+haproxy_pg_ro_port: "{{ proxy_pg_ro_port | default(5433) }}"
 
 # Connection limits
 haproxy_maxconn_global: 4096

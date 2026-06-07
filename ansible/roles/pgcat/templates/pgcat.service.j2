@@ -1,0 +1,16 @@
+[Unit]
+Description=PgCat PostgreSQL proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ pgcat_user }}
+Group={{ pgcat_group }}
+ExecStart={{ pgcat_binary }} {{ pgcat_config_file }}
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

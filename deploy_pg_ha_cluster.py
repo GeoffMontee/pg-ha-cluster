@@ -21,7 +21,7 @@ GENERATED_TFVARS = TERRAFORM_DIR / "generated.auto.tfvars.json"
 PASSWORD_ENV_VARS = {
     "repmgr_password": "PG_HA_REPMGR_PASSWORD",
     "postgres_password": "PG_HA_POSTGRES_PASSWORD",
-    "haproxy_stats_password": "PG_HA_HAPROXY_STATS_PASSWORD",
+    "proxy_admin_password": "PG_HA_PROXY_ADMIN_PASSWORD",
 }
 
 
@@ -70,13 +70,14 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
         "create_network": not bool(args.existing_vpc),
         "vpc_cidr": args.vpc_cidr,
         "public_subnet_cidr": args.subnet_cidr,
+        "proxy_type": args.proxy_type,
         "postgresql_version": args.postgres_version,
         "pg_volume_size": args.pg_volume_size,
         "enable_local_nvme": not args.no_local_nvme,
         "gcp_pg_local_ssd_count": args.gcp_pg_local_ssd_count,
         "repmgr_password": password_value(args, "repmgr_password"),
         "postgres_password": password_value(args, "postgres_password"),
-        "haproxy_stats_password": password_value(args, "haproxy_stats_password"),
+        "proxy_admin_password": password_value(args, "proxy_admin_password"),
     }
 
     if args.owner:
@@ -86,7 +87,7 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
     if args.pg_instance_type:
         tfvars["pg_instance_type"] = args.pg_instance_type
     if args.proxy_instance_type:
-        tfvars["haproxy_instance_type"] = args.proxy_instance_type
+        tfvars["proxy_instance_type"] = args.proxy_instance_type
 
     if args.provider == "aws":
         tfvars["aws_region"] = args.aws_region
@@ -205,8 +206,9 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--subnet-cidr", default="10.0.1.0/24", help="CIDR for the created public subnet/subnetwork")
     parser.add_argument("--existing-vpc", help="Existing AWS VPC ID or GCP VPC network name/self link")
     parser.add_argument("--existing-subnet", help="Existing AWS subnet ID or GCP subnetwork name/self link")
+    parser.add_argument("--proxy-type", choices=["haproxy", "pgpool", "proxysql", "pgcat"], default="haproxy", help="PostgreSQL proxy implementation")
     parser.add_argument("--pg-instance-type", help="PostgreSQL node instance/machine type")
-    parser.add_argument("--proxy-instance-type", help="HAProxy node instance/machine type")
+    parser.add_argument("--proxy-instance-type", help="Proxy node instance/machine type")
     parser.add_argument("--postgres-version", default="18", help="PostgreSQL major version to install")
     parser.add_argument("--pg-volume-size", type=int, default=50, help="Root volume size in GB for PostgreSQL nodes")
     parser.add_argument("--no-local-nvme", action="store_true", help="Disable mounting local NVMe storage for PostgreSQL data")
@@ -217,7 +219,7 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--gcp-pg-local-ssd-count", type=int, default=1, help="Local SSD scratch disks per GCP PostgreSQL node")
     parser.add_argument("--repmgr-password", help=f"repmgr password; defaults to ${PASSWORD_ENV_VARS['repmgr_password']} or a generated value")
     parser.add_argument("--postgres-password", help=f"postgres password; defaults to ${PASSWORD_ENV_VARS['postgres_password']} or a generated value")
-    parser.add_argument("--haproxy-stats-password", help=f"HAProxy stats password; defaults to ${PASSWORD_ENV_VARS['haproxy_stats_password']} or a generated value")
+    parser.add_argument("--proxy-admin-password", help=f"Proxy admin password; defaults to ${PASSWORD_ENV_VARS['proxy_admin_password']} or a generated value")
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -30,14 +30,15 @@ def test_deploy_defaults_generate_aws_tfvars(monkeypatch):
     assert tfvars["cloud_provider"] == "aws"
     assert tfvars["aws_region"] == "us-east-1"
     assert tfvars["project_name"] == "pg-ha-cluster"
+    assert tfvars["proxy_type"] == "haproxy"
     assert tfvars["postgresql_version"] == "18"
     assert tfvars["create_network"] is True
     assert tfvars["enable_local_nvme"] is True
     assert "pg_instance_type" not in tfvars
-    assert "haproxy_instance_type" not in tfvars
+    assert "proxy_instance_type" not in tfvars
     assert tfvars["repmgr_password"] == "generated-secret"
     assert tfvars["postgres_password"] == "generated-secret"
-    assert tfvars["haproxy_stats_password"] == "generated-secret"
+    assert tfvars["proxy_admin_password"] == "generated-secret"
 
 
 def test_deploy_overrides_network_postgres_version_and_instances():
@@ -57,6 +58,8 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "i7ie.8xlarge",
         "--proxy-instance-type",
         "c7i.8xlarge",
+        "--proxy-type",
+        "pgcat",
         "--postgres-version",
         "17",
         "--no-local-nvme",
@@ -64,8 +67,8 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "repmgr-secret",
         "--postgres-password",
         "postgres-secret",
-        "--haproxy-stats-password",
-        "stats-secret",
+        "--proxy-admin-password",
+        "proxy-secret",
     )
 
     tfvars = deploy_pg_ha_cluster.build_tfvars(args)
@@ -75,12 +78,13 @@ def test_deploy_overrides_network_postgres_version_and_instances():
     assert tfvars["existing_subnet_id"] == "subnet-123"
     assert tfvars["allowed_ssh_cidrs"] == ["203.0.113.10/32", "198.51.100.0/24"]
     assert tfvars["pg_instance_type"] == "i7ie.8xlarge"
-    assert tfvars["haproxy_instance_type"] == "c7i.8xlarge"
+    assert tfvars["proxy_instance_type"] == "c7i.8xlarge"
+    assert tfvars["proxy_type"] == "pgcat"
     assert tfvars["postgresql_version"] == "17"
     assert tfvars["enable_local_nvme"] is False
     assert tfvars["repmgr_password"] == "repmgr-secret"
     assert tfvars["postgres_password"] == "postgres-secret"
-    assert tfvars["haproxy_stats_password"] == "stats-secret"
+    assert tfvars["proxy_admin_password"] == "proxy-secret"
 
 
 def test_existing_network_requires_vpc_and_subnet():
@@ -88,6 +92,15 @@ def test_existing_network_requires_vpc_and_subnet():
 
     with pytest.raises(SystemExit, match="--existing-vpc and --existing-subnet"):
         deploy_pg_ha_cluster.build_tfvars(args)
+
+
+@pytest.mark.parametrize("proxy_type", ["haproxy", "pgpool", "proxysql", "pgcat"])
+def test_supported_proxy_types_are_written_to_tfvars(proxy_type):
+    args = parse_args("deploy", "--proxy-type", proxy_type)
+
+    tfvars = deploy_pg_ha_cluster.build_tfvars(args)
+
+    assert tfvars["proxy_type"] == proxy_type
 
 
 def test_gcp_requires_project_id_when_env_is_absent(monkeypatch):
