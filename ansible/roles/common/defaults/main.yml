@@ -12,3 +12,10 @@ common_packages:
   - net-tools
   - vim
   - htop
+  - xfsprogs
+
+# Optional local NVMe storage for PostgreSQL data.
+local_nvme_mount_enabled: false
+local_nvme_device: ""
+local_nvme_mount_point: "/var/lib/postgresql"
+local_nvme_filesystem: "xfs"

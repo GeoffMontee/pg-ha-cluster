@@ -1,12 +1,42 @@
+variable "cloud_provider" {
+  description = "Cloud provider to deploy into. Valid values are aws or gcp."
+  type        = string
+  default     = "aws"
+
+  validation {
+    condition     = contains(["aws", "gcp"], var.cloud_provider)
+    error_message = "cloud_provider must be either aws or gcp."
+  }
+}
+
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
   default     = "us-east-1"
 }
 
-variable "owner" {
-  description = "Owner tag value (required by AWS policy)"
+variable "gcp_project_id" {
+  description = "GCP project ID. Required when cloud_provider is gcp."
   type        = string
+  default     = ""
+}
+
+variable "gcp_region" {
+  description = "GCP region for the subnet"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "gcp_zone" {
+  description = "GCP zone for Compute Engine instances"
+  type        = string
+  default     = "us-central1-a"
+}
+
+variable "owner" {
+  description = "Owner tag or label value"
+  type        = string
+  default     = ""
 }
 
 variable "project_name" {
@@ -15,40 +45,88 @@ variable "project_name" {
   default     = "pg-ha-cluster"
 }
 
+variable "create_network" {
+  description = "Create a new VPC/network and public subnet/subnetwork"
+  type        = bool
+  default     = true
+}
+
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+  description = "CIDR block for the created VPC/network, or the internal CIDR to allow when using an existing network"
   type        = string
   default     = "10.0.0.0/16"
 }
 
 variable "public_subnet_cidr" {
-  description = "CIDR block for public subnet"
+  description = "CIDR block for the created public subnet/subnetwork"
   type        = string
   default     = "10.0.1.0/24"
 }
 
+variable "existing_vpc_id" {
+  description = "Existing AWS VPC ID to use when create_network is false"
+  type        = string
+  default     = ""
+}
+
+variable "existing_subnet_id" {
+  description = "Existing AWS subnet ID to use when create_network is false"
+  type        = string
+  default     = ""
+}
+
+variable "existing_gcp_network" {
+  description = "Existing GCP VPC network name or self link to use when create_network is false"
+  type        = string
+  default     = ""
+}
+
+variable "existing_gcp_subnetwork" {
+  description = "Existing GCP subnetwork name or self link to use when create_network is false"
+  type        = string
+  default     = ""
+}
+
 variable "allowed_ssh_cidrs" {
-  description = "CIDR blocks allowed to SSH and connect to services"
+  description = "CIDR blocks allowed to SSH and connect to exposed services"
   type        = list(string)
   default     = ["0.0.0.0/0"] # Restrict this in production!
 }
 
 variable "pg_instance_type" {
-  description = "EC2 instance type for PostgreSQL nodes"
+  description = "Instance or machine type for PostgreSQL nodes. Defaults are cloud-specific."
   type        = string
-  default     = "t3.medium"
+  default     = null
 }
 
 variable "haproxy_instance_type" {
-  description = "EC2 instance type for HAProxy node"
+  description = "Instance or machine type for the HAProxy node. Defaults are cloud-specific."
   type        = string
-  default     = "t3.small"
+  default     = null
+}
+
+variable "postgresql_version" {
+  description = "PostgreSQL major version to install"
+  type        = string
+  default     = "18"
 }
 
 variable "pg_volume_size" {
   description = "Root volume size in GB for PostgreSQL nodes"
   type        = number
   default     = 50
+}
+
+variable "enable_local_nvme" {
+  description = "Mount local NVMe instance storage at /var/lib/postgresql on database nodes"
+  type        = bool
+  default     = true
+}
+
+variable "gcp_pg_local_ssd_count" {
+  description = "Number of local SSD scratch disks to attach to each GCP PostgreSQL node"
+  type        = number
+  default     = 1
 }
 
 variable "repmgr_password" {

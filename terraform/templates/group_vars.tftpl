@@ -1,17 +1,25 @@
 ---
 # PostgreSQL Configuration
-postgresql_version: "17"
+postgresql_version: "${postgresql_version}"
 postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
 postgresql_config_dir: "/etc/postgresql/{{ postgresql_version }}/main"
 postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
 
 # Network Configuration
+cloud_provider: "${cloud_provider}"
+vpc_cidr: "${vpc_cidr}"
 pg_primary_ip: "${pg_primary_private_ip}"
 pg_standby_ips:
 %{ for ip in pg_standby_private_ips ~}
   - "${ip}"
 %{ endfor ~}
 haproxy_ip: "${haproxy_private_ip}"
+
+# Local NVMe storage. Terraform selects instance types with local NVMe by default;
+# Ansible discovers and mounts the first non-root NVMe disk on database nodes.
+local_nvme_mount_enabled: ${enable_local_nvme}
+local_nvme_mount_point: "/var/lib/postgresql"
+local_nvme_filesystem: "xfs"
 
 # Passwords (use ansible-vault in production!)
 repmgr_password: "${repmgr_password}"

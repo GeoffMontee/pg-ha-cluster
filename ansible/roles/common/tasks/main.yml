@@ -11,6 +11,62 @@
     state: present
   become: true
 
+- name: Discover local NVMe device for PostgreSQL data
+  ansible.builtin.shell: |
+    set -euo pipefail
+    root_source="$(findmnt -n -o SOURCE /)"
+    root_device="$(readlink -f "$root_source" || printf '%s' "$root_source")"
+    root_parent="$(lsblk -no PKNAME "$root_device" | sed -n '1p')"
+    if [ -z "$root_parent" ]; then
+      root_parent="$(basename "$root_device")"
+    fi
+    lsblk -ndo NAME,TYPE,MOUNTPOINT | awk -v root="$root_parent" '$2=="disk" && $3=="" && $1 != root && $1 ~ /^nvme/ {print "/dev/" $1; exit}'
+  args:
+    executable: /bin/bash
+  register: discovered_local_nvme
+  changed_when: false
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+    - local_nvme_device | length == 0
+  become: true
+
+- name: Select local NVMe device for PostgreSQL data
+  ansible.builtin.set_fact:
+    pg_local_nvme_device: "{{ local_nvme_device if local_nvme_device | length > 0 else discovered_local_nvme.stdout }}"
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+
+- name: Fail when local NVMe storage is requested but not found
+  ansible.builtin.fail:
+    msg: "local_nvme_mount_enabled is true, but no non-root NVMe disk was found. Use an instance type with local NVMe storage, set local_nvme_device, or disable local NVMe."
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+    - pg_local_nvme_device | default('') | length == 0
+
+- name: Create filesystem on local NVMe device
+  community.general.filesystem:
+    dev: "{{ pg_local_nvme_device }}"
+    fstype: "{{ local_nvme_filesystem }}"
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+  become: true
+
+- name: Mount local NVMe storage for PostgreSQL data
+  ansible.posix.mount:
+    path: "{{ local_nvme_mount_point }}"
+    src: "{{ pg_local_nvme_device }}"
+    fstype: "{{ local_nvme_filesystem }}"
+    opts: defaults,noatime,nofail
+    state: mounted
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+  become: true
+
 - name: Set timezone
   ansible.builtin.timezone:
     name: UTC

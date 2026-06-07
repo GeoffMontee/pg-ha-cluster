@@ -34,7 +34,7 @@ host    {{ repmgr_database }}    {{ repmgr_user }}    {{ ip }}/32               
 host    all             all             {{ haproxy_ip }}/32             scram-sha-256
 
 # VPC-wide access (adjust for production!)
-host    all             all             10.0.0.0/16             scram-sha-256
+host    all             all             {{ vpc_cidr }}             scram-sha-256
 
 # Application access (adjust CIDR as needed)
 host    all             all             0.0.0.0/0               scram-sha-256

@@ -1,5 +1,5 @@
 ---
-postgresql_version: "17"
+postgresql_version: "18"
 postgresql_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
 postgresql_config_dir: "/etc/postgresql/{{ postgresql_version }}/main"
 postgresql_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"
