@@ -7,6 +7,22 @@ This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP usi
 - **repmgr** for replication and automatic failover.
 - **HAProxy, pgpool-II, ProxySQL, or PgCat** as the PostgreSQL proxy.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Commands](#commands)
+- [Command-Line Options](#command-line-options)
+- [Cloud Defaults](#cloud-defaults)
+- [Existing VPC or Subnet](#existing-vpc-or-subnet)
+- [Connection Information](#connection-information)
+- [Operations](#operations)
+- [Directory Structure](#directory-structure)
+- [Security Notes](#security-notes)
+- [Validation](#validation)
+- [License](#license)
+
 ## Architecture
 
 ```
@@ -30,12 +46,18 @@ This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP usi
 
 - Python 3.10 or newer.
 - Terraform 1.0 or newer.
-- Ansible 2.15 or newer.
+- Python dependencies from `requirements.txt`, including `ansible-core`.
 - Cloud credentials configured for AWS or GCP.
 - AWS: credentials with EC2, VPC, security group, and key pair permissions.
 - GCP: Application Default Credentials or equivalent credentials with Compute Engine permissions.
 
 ## Quick Start
+
+Install Python dependencies:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
 
 Deploy to AWS with the default AWS instance types:
 
@@ -226,25 +248,6 @@ python3 deploy_pg_ha_cluster.py deploy \
 
 When using an existing subnet, ensure it can assign public IPs or otherwise provides SSH reachability from the machine running Ansible. The Terraform still creates the required security groups or firewall rules.
 
-## Manual Terraform and Ansible
-
-The deploy script is the supported way to generate Terraform variables. If you need to run the tools directly, first generate infrastructure only:
-
-```bash
-python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
-```
-
-Then rerun Terraform or Ansible commands directly as needed:
-
-```bash
-cd terraform
-terraform plan
-
-cd ../ansible
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook -i inventory/hosts.ini playbooks/site.yml
-```
-
 ## Connection Information
 
 After deployment, use:
@@ -292,7 +295,9 @@ curl http://<node-ip>:8008/health
 
 ```
 pg-ha-cluster/
+├── AGENTS.md
 ├── deploy_pg_ha_cluster.py
+├── requirements.txt
 ├── test/
 ├── terraform/
 │   ├── main.tf
@@ -325,7 +330,7 @@ pg-ha-cluster/
 ## Security Notes
 
 - Restrict `--allowed-cidr` to trusted networks.
-- Treat `terraform/generated.auto.tfvars.json`, `terraform.tfvars`, and Terraform state as sensitive.
+- Treat `terraform/generated.auto.tfvars.json`, Terraform state, generated SSH keys, and generated Ansible inventory as sensitive.
 - Use stronger secret handling, TLS, private subnets, and managed backups before using this for production traffic.
 - Review `ansible/roles/postgresql/templates/pg_hba.conf.j2` for your application access model.
 
@@ -336,7 +341,8 @@ Useful local checks:
 ```bash
 terraform -chdir=terraform fmt -recursive
 terraform -chdir=terraform validate
-python3 -m py_compile deploy_pg_ha_cluster.py
+python3 -m py_compile deploy_pg_ha_cluster.py test/test_deploy_pg_ha_cluster.py
+python3 -m pytest test
 ANSIBLE_CONFIG="$PWD/ansible/ansible.cfg" ansible-playbook --syntax-check -i "localhost," ansible/playbooks/site.yml
 ```
 
