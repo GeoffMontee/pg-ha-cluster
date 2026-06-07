@@ -88,11 +88,12 @@ locals {
   pg_standby_private_ips = local.deploy_aws ? aws_instance.pg_standby[*].private_ip : [
     for instance in google_compute_instance.pg_standby : instance.network_interface[0].network_ip
   ]
-  proxy_public_ip = local.deploy_aws ? try(aws_instance.proxy[0].public_ip, "") : try(google_compute_instance.proxy[0].network_interface[0].access_config[0].nat_ip, "")
-  proxy_private_ip = local.deploy_aws ? try(aws_instance.proxy[0].private_ip, "") : try(
-    google_compute_instance.proxy[0].network_interface[0].network_ip,
-    ""
-  )
+  proxy_public_ips = local.deploy_aws ? aws_instance.proxy[*].public_ip : [
+    for instance in google_compute_instance.proxy : instance.network_interface[0].access_config[0].nat_ip
+  ]
+  proxy_private_ips = local.deploy_aws ? aws_instance.proxy[*].private_ip : [
+    for instance in google_compute_instance.proxy : instance.network_interface[0].network_ip
+  ]
 }
 
 data "aws_ami" "ubuntu" {
@@ -383,7 +384,7 @@ resource "aws_instance" "pg_standby" {
 }
 
 resource "aws_instance" "proxy" {
-  count                  = local.deploy_aws ? 1 : 0
+  count                  = local.deploy_aws ? var.proxy_count : 0
   ami                    = data.aws_ami.ubuntu[0].id
   instance_type          = local.proxy_instance_type
   key_name               = aws_key_pair.pg_cluster[0].key_name
@@ -397,7 +398,7 @@ resource "aws_instance" "proxy" {
   }
 
   tags = merge({
-    Name = "${var.project_name}-proxy"
+    Name = "${var.project_name}-proxy-${count.index + 1}"
     Role = "proxy"
     Type = var.proxy_type
   }, local.common_tags)
@@ -474,8 +475,8 @@ resource "google_compute_instance" "pg_standby" {
 }
 
 resource "google_compute_instance" "proxy" {
-  count        = local.deploy_gcp ? 1 : 0
-  name         = "${var.project_name}-proxy"
+  count        = local.deploy_gcp ? var.proxy_count : 0
+  name         = "${var.project_name}-proxy-${count.index + 1}"
   machine_type = local.proxy_instance_type
   zone         = var.gcp_zone
   tags         = [local.gcp_proxy_tag, local.gcp_pg_tag]
@@ -507,8 +508,8 @@ resource "local_file" "ansible_inventory" {
     pg_primary_private_ip  = local.pg_primary_private_ip
     pg_standby_ips         = local.pg_standby_public_ips
     pg_standby_private_ips = local.pg_standby_private_ips
-    proxy_ip               = local.proxy_public_ip
-    proxy_private_ip       = local.proxy_private_ip
+    proxy_ips              = local.proxy_public_ips
+    proxy_private_ips      = local.proxy_private_ips
     ssh_key_file           = "${var.project_name}-key.pem"
     ssh_user               = "ubuntu"
   })
@@ -520,13 +521,15 @@ resource "local_file" "ansible_group_vars" {
     cloud_provider         = var.cloud_provider
     vpc_cidr               = var.vpc_cidr
     proxy_type             = var.proxy_type
+    proxy_count            = var.proxy_count
+    proxy_vip              = var.proxy_vip
     proxy_pg_rw_port       = local.proxy_pg_rw_port
     proxy_pg_ro_port       = local.proxy_pg_ro_port
     proxy_admin_port       = local.proxy_admin_port
     postgresql_version     = var.postgresql_version
     pg_primary_private_ip  = local.pg_primary_private_ip
     pg_standby_private_ips = local.pg_standby_private_ips
-    proxy_private_ip       = local.proxy_private_ip
+    proxy_private_ips      = local.proxy_private_ips
     enable_local_nvme      = var.enable_local_nvme
     repmgr_password        = var.repmgr_password
     postgres_password      = var.postgres_password

@@ -116,6 +116,23 @@ variable "proxy_instance_type" {
   default     = null
 }
 
+variable "proxy_count" {
+  description = "Number of proxy nodes to deploy. Use 2 with proxy_vip to enable keepalived VRRP."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2], var.proxy_count)
+    error_message = "proxy_count must be 1 or 2."
+  }
+}
+
+variable "proxy_vip" {
+  description = "VRRP virtual IP for two-node proxy HA. Required when proxy_count is 2."
+  type        = string
+  default     = ""
+}
+
 variable "postgresql_version" {
   description = "PostgreSQL major version to install"
   type        = string

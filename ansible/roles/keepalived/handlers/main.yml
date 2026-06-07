@@ -1,0 +1,6 @@
+---
+- name: Restart keepalived
+  ansible.builtin.systemd:
+    name: "{{ keepalived_service }}"
+    state: restarted
+  become: true

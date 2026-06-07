@@ -16,4 +16,6 @@ pg_primary
 pg_standby
 
 [proxy]
-proxy ansible_host=${proxy_ip} private_ip=${proxy_private_ip}
+%{ for i, ip in proxy_ips ~}
+proxy-${i + 1} ansible_host=${ip} private_ip=${proxy_private_ips[i]} vrrp_priority=${110 - i * 10}
+%{ endfor ~}

@@ -63,6 +63,8 @@ def ensure_generated_dirs() -> None:
 def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
     if bool(args.existing_vpc) != bool(args.existing_subnet):
         raise SystemExit("--existing-vpc and --existing-subnet must be supplied together")
+    if args.proxy_count == 2 and not args.proxy_vip:
+        raise SystemExit("--proxy-vip is required when --proxy-count 2")
 
     tfvars: dict[str, Any] = {
         "cloud_provider": args.provider,
@@ -71,6 +73,8 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
         "vpc_cidr": args.vpc_cidr,
         "public_subnet_cidr": args.subnet_cidr,
         "proxy_type": args.proxy_type,
+        "proxy_count": args.proxy_count,
+        "proxy_vip": args.proxy_vip or "",
         "postgresql_version": args.postgres_version,
         "pg_volume_size": args.pg_volume_size,
         "enable_local_nvme": not args.no_local_nvme,
@@ -207,6 +211,8 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--existing-vpc", help="Existing AWS VPC ID or GCP VPC network name/self link")
     parser.add_argument("--existing-subnet", help="Existing AWS subnet ID or GCP subnetwork name/self link")
     parser.add_argument("--proxy-type", choices=["haproxy", "pgpool", "proxysql", "pgcat"], default="haproxy", help="PostgreSQL proxy implementation")
+    parser.add_argument("--proxy-count", type=int, choices=[1, 2], default=1, help="Number of proxy nodes to deploy")
+    parser.add_argument("--proxy-vip", help="VRRP virtual IP for two-node proxy HA; required when --proxy-count 2")
     parser.add_argument("--pg-instance-type", help="PostgreSQL node instance/machine type")
     parser.add_argument("--proxy-instance-type", help="Proxy node instance/machine type")
     parser.add_argument("--postgres-version", default="18", help="PostgreSQL major version to install")

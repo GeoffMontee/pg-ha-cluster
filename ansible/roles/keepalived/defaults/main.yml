@@ -1,0 +1,9 @@
+---
+keepalived_package: "keepalived"
+keepalived_service: "keepalived"
+keepalived_config_file: "/etc/keepalived/keepalived.conf"
+keepalived_router_id: 51
+keepalived_auth_pass: "{{ proxy_admin_password | hash('sha1') | truncate(8, true, '') }}"
+keepalived_interface: ""
+keepalived_advert_interval: 1
+keepalived_virtual_ip: "{{ proxy_vip }}"

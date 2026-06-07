@@ -56,6 +56,17 @@
   tags:
     - proxy
 
+- name: Configure proxy VRRP failover
+  hosts: proxy
+  gather_facts: yes
+  become: true
+  roles:
+    - role: keepalived
+      when: proxy_count | int == 2
+  tags:
+    - proxy
+    - keepalived
+
 - name: Verify cluster deployment
   hosts: pg_primary
   gather_facts: no

@@ -1,0 +1,39 @@
+---
+- name: Validate proxy VIP is configured
+  ansible.builtin.assert:
+    that:
+      - keepalived_virtual_ip | length > 0
+    fail_msg: "proxy_vip is required when proxy_count is 2."
+
+- name: Install keepalived
+  ansible.builtin.apt:
+    name: "{{ keepalived_package }}"
+    state: present
+  become: true
+
+- name: Discover default network interface
+  ansible.builtin.command: sh -c "ip route show default | awk '{print $5; exit}'"
+  register: keepalived_default_interface
+  changed_when: false
+  when: keepalived_interface | length == 0
+
+- name: Select keepalived network interface
+  ansible.builtin.set_fact:
+    keepalived_selected_interface: "{{ keepalived_interface if keepalived_interface | length > 0 else keepalived_default_interface.stdout }}"
+
+- name: Configure keepalived
+  ansible.builtin.template:
+    src: keepalived.conf.j2
+    dest: "{{ keepalived_config_file }}"
+    owner: root
+    group: root
+    mode: '0600'
+  become: true
+  notify: Restart keepalived
+
+- name: Enable and start keepalived
+  ansible.builtin.systemd:
+    name: "{{ keepalived_service }}"
+    state: started
+    enabled: yes
+  become: true

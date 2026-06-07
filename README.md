@@ -107,6 +107,8 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--existing-vpc ID_OR_SELF_LINK`: Existing AWS VPC ID or GCP VPC network name/self link. Must be used with `--existing-subnet`.
 - `--existing-subnet ID_OR_SELF_LINK`: Existing AWS subnet ID or GCP subnetwork name/self link. Must be used with `--existing-vpc`.
 - `--proxy-type {haproxy,pgpool,proxysql,pgcat}`: PostgreSQL proxy implementation. Defaults to `haproxy`.
+- `--proxy-count {1,2}`: Number of proxy nodes. Defaults to `1`.
+- `--proxy-vip IP`: VRRP virtual IP for two-node proxy HA. Required when `--proxy-count 2`.
 - `--pg-instance-type TYPE`: PostgreSQL node instance or machine type. Defaults are cloud-specific.
 - `--proxy-instance-type TYPE`: Proxy node instance or machine type. Defaults are cloud-specific.
 - `--postgres-version VERSION`: PostgreSQL major version to install. Defaults to `18`.
@@ -171,6 +173,17 @@ Proxy-specific exposed ports:
 - `pgcat`: PostgreSQL proxy on `5432`, Prometheus/admin endpoint on `9930`.
 
 ProxySQL is installed from the target host's configured apt repositories. PgCat is installed with Cargo by the `pgcat` role.
+
+Deploy two proxy nodes with keepalived/VRRP:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy \
+  --provider aws \
+  --proxy-count 2 \
+  --proxy-vip 10.0.1.50
+```
+
+`--proxy-count 2` configures keepalived with unicast VRRP between the proxy nodes. AWS and GCP do not generally route an arbitrary floating IP by VRRP alone; the VIP must be valid for your network design and may require cloud-specific secondary IP, alias IP, route, or load-balancer configuration outside of keepalived.
 
 Disable the local NVMe mount if you choose an instance type without local NVMe storage:
 
@@ -244,6 +257,7 @@ The selected proxy exposes:
 
 - Port `5432` for PostgreSQL client connections.
 - Optional proxy-specific read-only or admin ports listed in the proxy defaults above.
+- When `--proxy-vip` is set, Terraform connection output uses the VIP for `pg_proxy_port`.
 
 ## Operations
 
@@ -301,6 +315,7 @@ pg-ha-cluster/
         ├── postgresql/
         ├── repmgr/
         ├── pg_healthcheck/
+        ├── keepalived/
         ├── haproxy/
         ├── pgpool/
         ├── proxysql/
