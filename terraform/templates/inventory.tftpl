@@ -4,11 +4,11 @@ ansible_ssh_private_key_file={{ inventory_dir }}/${ssh_key_file}
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
 [pg_primary]
-pg-primary ansible_host=${pg_primary_ip} private_ip=${pg_primary_private_ip} node_id=1 node_priority=100
+pg-primary ansible_host=${pg_primary_ip} private_ip=${pg_primary_private_ip} node_id=1 node_priority=100%{ if ssh_jump_host != "" } ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ProxyJump=${ssh_user}@${ssh_jump_host}'%{ endif }
 
 [pg_standby]
 %{ for i, ip in pg_standby_ips ~}
-pg-standby-${i + 1} ansible_host=${ip} private_ip=${pg_standby_private_ips[i]} node_id=${i + 2} node_priority=${100 - (i + 1) * 10}
+pg-standby-${i + 1} ansible_host=${ip} private_ip=${pg_standby_private_ips[i]} node_id=${i + 2} node_priority=${100 - (i + 1) * 10}%{ if ssh_jump_host != "" } ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ProxyJump=${ssh_user}@${ssh_jump_host}'%{ endif }
 %{ endfor ~}
 
 [pg_cluster:children]
@@ -19,3 +19,8 @@ pg_standby
 %{ for i, ip in proxy_ips ~}
 proxy-${i + 1} ansible_host=${ip} private_ip=${proxy_private_ips[i]} vrrp_priority=${110 - i * 10}
 %{ endfor ~}
+
+%{ if bastion_ip != "" ~}
+[bastion]
+bastion ansible_host=${bastion_ip} private_ip=${bastion_private_ip}
+%{ endif ~}

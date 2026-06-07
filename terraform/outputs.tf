@@ -33,6 +33,11 @@ output "proxy_type" {
   value       = var.proxy_type
 }
 
+output "public_db_nodes" {
+  description = "Whether PostgreSQL database nodes have public IP addresses"
+  value       = var.public_db_nodes
+}
+
 output "proxy_private_vip" {
   description = "Private VRRP virtual IP when two proxy nodes are deployed"
   value       = local.proxy_private_vip
@@ -48,15 +53,22 @@ output "ssh_private_key_file" {
   value       = local_file.private_key.filename
 }
 
+output "bastion_public_ip" {
+  description = "Public IP of the bastion host when created"
+  value       = local.bastion_public_ip
+}
+
 output "connection_info" {
   description = "Connection information"
   value = {
-    ssh_to_primary        = "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_primary_public_ip}"
-    ssh_to_standby_1      = "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[0]}"
-    ssh_to_standby_2      = "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[1]}"
+    ssh_to_primary        = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_primary_public_ip}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_primary_private_ip}"
+    ssh_to_standby_1      = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[0]}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[0]}"
+    ssh_to_standby_2      = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[1]}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[1]}"
     ssh_to_proxy_1        = "ssh -i ${local_file.private_key.filename} ubuntu@${local.proxy_public_ips[0]}"
     ssh_to_proxy_2        = var.proxy_count == 2 ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.proxy_public_ips[1]}" : null
+    ssh_to_bastion        = var.create_bastion ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.bastion_public_ip}" : null
     proxy_type            = var.proxy_type
+    ssh_jump_host         = local.ssh_jump_host
     proxy_private_vip     = local.proxy_private_vip
     proxy_public_vip      = local.proxy_public_vip
     pg_proxy_private_port = local.proxy_private_vip != "" ? "${local.proxy_private_vip}:${local.proxy_pg_rw_port}" : null

@@ -70,6 +70,9 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
         "create_network": not bool(args.existing_vpc),
         "vpc_cidr": args.vpc_cidr,
         "public_subnet_cidr": args.subnet_cidr,
+        "private_subnet_cidr": args.private_subnet_cidr,
+        "public_db_nodes": args.public_db_nodes,
+        "create_bastion": args.create_bastion,
         "proxy_type": args.proxy_type,
         "proxy_count": args.proxy_count,
         "proxy_vip": args.proxy_vip or "",
@@ -92,6 +95,8 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
         tfvars["pg_instance_type"] = args.pg_instance_type
     if args.proxy_instance_type:
         tfvars["proxy_instance_type"] = args.proxy_instance_type
+    if args.bastion_instance_type:
+        tfvars["bastion_instance_type"] = args.bastion_instance_type
 
     if args.provider == "aws":
         tfvars["aws_region"] = args.aws_region
@@ -208,8 +213,11 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--allowed-cidr", action="append", help="CIDR allowed to SSH and connect to exposed services")
     parser.add_argument("--vpc-cidr", default="10.0.0.0/16", help="Created VPC CIDR, or internal CIDR for existing networks")
     parser.add_argument("--subnet-cidr", default="10.0.1.0/24", help="CIDR for the created public subnet/subnetwork")
+    parser.add_argument("--private-subnet-cidr", default="10.0.2.0/24", help="CIDR for the created private database subnet/subnetwork")
     parser.add_argument("--existing-vpc", help="Existing AWS VPC ID or GCP VPC network name/self link")
     parser.add_argument("--existing-subnet", help="Existing AWS subnet ID or GCP subnetwork name/self link")
+    parser.add_argument("--public-db-nodes", action="store_true", help="Assign public IP addresses to PostgreSQL database nodes")
+    parser.add_argument("--create-bastion", action="store_true", help="Create a public bastion host with SSH access to database and proxy nodes")
     parser.add_argument("--proxy-type", choices=["haproxy", "pgpool", "proxysql", "pgcat"], default="haproxy", help="PostgreSQL proxy implementation")
     parser.add_argument("--proxy-count", type=int, choices=[1, 2], default=1, help="Number of proxy nodes to deploy")
     parser.add_argument("--proxy-vip", "--proxy-private-vip", dest="proxy_vip", help="Private VRRP VIP for two-node proxy HA; defaults to an address derived from --subnet-cidr")
@@ -217,6 +225,7 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--proxy-public-vip", action="store_true", help="Reserve a static public IP for the proxy endpoint")
     parser.add_argument("--pg-instance-type", help="PostgreSQL node instance/machine type")
     parser.add_argument("--proxy-instance-type", help="Proxy node instance/machine type")
+    parser.add_argument("--bastion-instance-type", help="Bastion node instance/machine type")
     parser.add_argument("--postgres-version", default="18", help="PostgreSQL major version to install")
     parser.add_argument("--pg-volume-size", type=int, default=50, help="Root volume size in GB for PostgreSQL nodes")
     parser.add_argument("--no-local-nvme", action="store_true", help="Disable mounting local NVMe storage for PostgreSQL data")

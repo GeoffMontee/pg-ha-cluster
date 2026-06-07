@@ -35,6 +35,9 @@ def test_deploy_defaults_generate_aws_tfvars(monkeypatch):
     assert tfvars["proxy_vip"] == ""
     assert tfvars["proxy_vip_hostnum"] == 50
     assert tfvars["create_proxy_public_vip"] is False
+    assert tfvars["public_db_nodes"] is False
+    assert tfvars["private_subnet_cidr"] == "10.0.2.0/24"
+    assert tfvars["create_bastion"] is False
     assert tfvars["postgresql_version"] == "18"
     assert tfvars["create_network"] is True
     assert tfvars["enable_local_nvme"] is True
@@ -54,6 +57,10 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "vpc-123",
         "--existing-subnet",
         "subnet-123",
+        "--private-subnet-cidr",
+        "10.20.2.0/24",
+        "--public-db-nodes",
+        "--create-bastion",
         "--allowed-cidr",
         "203.0.113.10/32",
         "--allowed-cidr",
@@ -62,6 +69,8 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "i7ie.8xlarge",
         "--proxy-instance-type",
         "c7i.8xlarge",
+        "--bastion-instance-type",
+        "t3.small",
         "--proxy-type",
         "pgcat",
         "--proxy-count",
@@ -87,9 +96,13 @@ def test_deploy_overrides_network_postgres_version_and_instances():
     assert tfvars["create_network"] is False
     assert tfvars["existing_vpc_id"] == "vpc-123"
     assert tfvars["existing_subnet_id"] == "subnet-123"
+    assert tfvars["private_subnet_cidr"] == "10.20.2.0/24"
+    assert tfvars["public_db_nodes"] is True
+    assert tfvars["create_bastion"] is True
     assert tfvars["allowed_ssh_cidrs"] == ["203.0.113.10/32", "198.51.100.0/24"]
     assert tfvars["pg_instance_type"] == "i7ie.8xlarge"
     assert tfvars["proxy_instance_type"] == "c7i.8xlarge"
+    assert tfvars["bastion_instance_type"] == "t3.small"
     assert tfvars["proxy_type"] == "pgcat"
     assert tfvars["proxy_count"] == 2
     assert tfvars["proxy_vip"] == "10.20.1.50"

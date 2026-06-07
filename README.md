@@ -56,7 +56,7 @@ This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP usi
     └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
-By default, the cluster has one proxy node. Set `--proxy-count 2` to deploy a second proxy and configure keepalived/VRRP between the proxy nodes. If you do not provide `--proxy-vip`, Terraform derives a private VRRP VIP from `--subnet-cidr`.
+By default, the cluster has one public proxy node and private-only PostgreSQL nodes. Terraform-owned networks include NAT for private database node egress. Set `--create-bastion` to add a public SSH bastion, or use `--public-db-nodes` to assign public IPs directly to database nodes. Set `--proxy-count 2` to deploy a second proxy and configure keepalived/VRRP between the proxy nodes. If you do not provide `--proxy-vip`, Terraform derives a private VRRP VIP from `--subnet-cidr`.
 
 ## Prerequisites
 
@@ -142,8 +142,11 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--allowed-cidr CIDR`: CIDR allowed to SSH and connect to exposed services. Can be repeated.
 - `--vpc-cidr CIDR`: Created VPC/network CIDR, or the internal CIDR to trust when using an existing network. Defaults to `10.0.0.0/16`.
 - `--subnet-cidr CIDR`: CIDR for the created public subnet/subnetwork. Defaults to `10.0.1.0/24`.
+- `--private-subnet-cidr CIDR`: CIDR for the created private database subnet/subnetwork. Defaults to `10.0.2.0/24`.
 - `--existing-vpc ID_OR_SELF_LINK`: Existing AWS VPC ID or GCP VPC network name/self link. Must be used with `--existing-subnet`.
 - `--existing-subnet ID_OR_SELF_LINK`: Existing AWS subnet ID or GCP subnetwork name/self link. Must be used with `--existing-vpc`.
+- `--public-db-nodes`: Assign public IP addresses to PostgreSQL database nodes. By default, database nodes are private-only.
+- `--create-bastion`: Create a public bastion host with SSH access to database and proxy nodes.
 - `--proxy-type {haproxy,pgpool,proxysql,pgcat}`: PostgreSQL proxy implementation. Defaults to `haproxy`.
 - `--proxy-count {1,2}`: Number of proxy nodes. Defaults to `1`.
 - `--proxy-vip IP`: Explicit private VRRP virtual IP for two-node proxy HA. If omitted with `--proxy-count 2`, Terraform derives one from `--subnet-cidr`.
@@ -151,6 +154,7 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--proxy-public-vip`: Reserve a static public IP for the proxy endpoint and attach it to the first proxy node.
 - `--pg-instance-type TYPE`: PostgreSQL node instance or machine type. Defaults are cloud-specific.
 - `--proxy-instance-type TYPE`: Proxy node instance or machine type. Defaults are cloud-specific.
+- `--bastion-instance-type TYPE`: Bastion node instance or machine type. Defaults are cloud-specific.
 - `--postgres-version VERSION`: PostgreSQL major version to install. Defaults to `18`.
 - `--pg-volume-size GB`: Root volume size for PostgreSQL nodes. Defaults to `50`.
 - `--no-local-nvme`: Disable local NVMe/local SSD mounting for PostgreSQL data.
@@ -176,18 +180,20 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 
 ## Cloud Defaults
 
-By default, the Terraform configuration creates a VPC/network, a public subnet/subnetwork, firewall rules/security groups, three PostgreSQL nodes, and one proxy node.
+By default, the Terraform configuration creates a VPC/network, a public proxy subnet/subnetwork, a private database subnet/subnetwork, NAT for private database node egress, firewall rules/security groups, three PostgreSQL nodes, and one proxy node.
 
 AWS defaults:
 
 - PostgreSQL nodes: `i7ie.4xlarge`
 - Proxy node: `c7i.4xlarge`
+- Bastion node: `t3.micro`
 - PostgreSQL data: local NVMe instance store mounted at `/var/lib/postgresql`
 
 GCP defaults:
 
 - PostgreSQL nodes: `c4d-standard-16`
 - Proxy node: `c4-standard-16`
+- Bastion node: `e2-micro`
 - PostgreSQL data: one local SSD scratch disk per database node, mounted at `/var/lib/postgresql`
 
 Override instance types with:
@@ -198,6 +204,22 @@ python3 deploy_pg_ha_cluster.py deploy \
   --pg-instance-type i7ie.8xlarge \
   --proxy-instance-type c7i.8xlarge
 ```
+
+Deploy public database nodes instead of private-only database nodes:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy --provider aws --public-db-nodes
+```
+
+When `--public-db-nodes` is not set and Terraform creates the network, the deployment also creates an AWS NAT Gateway or GCP Cloud NAT so private database nodes can reach package repositories during provisioning. With an existing VPC/subnetwork, outbound NAT is assumed to already exist if private database nodes need internet access.
+
+Create a bastion host:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy --provider aws --create-bastion
+```
+
+The bastion has a public IP and accepts SSH from `--allowed-cidr`. Terraform installs the generated SSH private key on the bastion so the `ubuntu` user can SSH passwordlessly to database and proxy nodes. When database nodes are private-only, the generated Ansible inventory connects through the bastion if present; otherwise it uses `proxy-1` as the SSH jump host.
 
 Select a proxy implementation with:
 
@@ -273,7 +295,7 @@ python3 deploy_pg_ha_cluster.py deploy \
   --allowed-cidr YOUR_IP/32
 ```
 
-When using an existing subnet, ensure it can assign public IPs or otherwise provides SSH reachability from the machine running Ansible. The Terraform still creates the required security groups or firewall rules.
+When using an existing subnet, Terraform does not create NAT. If `--public-db-nodes` is not set, make sure the subnet has outbound NAT for package installation and that private database nodes are reachable through the generated jump host. Terraform still creates the required security groups or firewall rules.
 
 ## Connection Information
 

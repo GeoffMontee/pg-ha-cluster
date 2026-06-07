@@ -63,6 +63,12 @@ variable "public_subnet_cidr" {
   default     = "10.0.1.0/24"
 }
 
+variable "private_subnet_cidr" {
+  description = "CIDR block for the created private database subnet/subnetwork"
+  type        = string
+  default     = "10.0.2.0/24"
+}
+
 variable "existing_vpc_id" {
   description = "Existing AWS VPC ID to use when create_network is false"
   type        = string
@@ -95,6 +101,24 @@ variable "allowed_ssh_cidrs" {
 
 variable "pg_instance_type" {
   description = "Instance or machine type for PostgreSQL nodes. Defaults are cloud-specific."
+  type        = string
+  default     = null
+}
+
+variable "public_db_nodes" {
+  description = "Assign public IP addresses to PostgreSQL database nodes"
+  type        = bool
+  default     = false
+}
+
+variable "create_bastion" {
+  description = "Create a public bastion host with SSH access to database and proxy nodes"
+  type        = bool
+  default     = false
+}
+
+variable "bastion_instance_type" {
+  description = "Instance or machine type for the bastion node. Defaults are cloud-specific."
   type        = string
   default     = null
 }
