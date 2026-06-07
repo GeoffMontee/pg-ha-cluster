@@ -63,8 +63,6 @@ def ensure_generated_dirs() -> None:
 def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
     if bool(args.existing_vpc) != bool(args.existing_subnet):
         raise SystemExit("--existing-vpc and --existing-subnet must be supplied together")
-    if args.proxy_count == 2 and not args.proxy_vip:
-        raise SystemExit("--proxy-vip is required when --proxy-count 2")
 
     tfvars: dict[str, Any] = {
         "cloud_provider": args.provider,
@@ -75,6 +73,8 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
         "proxy_type": args.proxy_type,
         "proxy_count": args.proxy_count,
         "proxy_vip": args.proxy_vip or "",
+        "proxy_vip_hostnum": args.proxy_vip_hostnum,
+        "create_proxy_public_vip": args.proxy_public_vip,
         "postgresql_version": args.postgres_version,
         "pg_volume_size": args.pg_volume_size,
         "enable_local_nvme": not args.no_local_nvme,
@@ -212,7 +212,9 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--existing-subnet", help="Existing AWS subnet ID or GCP subnetwork name/self link")
     parser.add_argument("--proxy-type", choices=["haproxy", "pgpool", "proxysql", "pgcat"], default="haproxy", help="PostgreSQL proxy implementation")
     parser.add_argument("--proxy-count", type=int, choices=[1, 2], default=1, help="Number of proxy nodes to deploy")
-    parser.add_argument("--proxy-vip", help="VRRP virtual IP for two-node proxy HA; required when --proxy-count 2")
+    parser.add_argument("--proxy-vip", "--proxy-private-vip", dest="proxy_vip", help="Private VRRP VIP for two-node proxy HA; defaults to an address derived from --subnet-cidr")
+    parser.add_argument("--proxy-vip-hostnum", type=int, default=50, help="Host number inside --subnet-cidr for an automatically generated private proxy VIP")
+    parser.add_argument("--proxy-public-vip", action="store_true", help="Reserve a static public IP for the proxy endpoint")
     parser.add_argument("--pg-instance-type", help="PostgreSQL node instance/machine type")
     parser.add_argument("--proxy-instance-type", help="Proxy node instance/machine type")
     parser.add_argument("--postgres-version", default="18", help="PostgreSQL major version to install")

@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - keepalived_virtual_ip | length > 0
-    fail_msg: "proxy_vip is required when proxy_count is 2."
+    fail_msg: "proxy_vip must be set before keepalived can configure proxy VRRP."
 
 - name: Install keepalived
   ansible.builtin.apt:

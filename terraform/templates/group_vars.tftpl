@@ -10,7 +10,9 @@ cloud_provider: "${cloud_provider}"
 vpc_cidr: "${vpc_cidr}"
 proxy_type: "${proxy_type}"
 proxy_count: ${proxy_count}
-proxy_vip: "${proxy_vip}"
+proxy_vip: "${proxy_private_vip}"
+proxy_private_vip: "${proxy_private_vip}"
+proxy_public_vip: "${proxy_public_vip}"
 pg_primary_ip: "${pg_primary_private_ip}"
 pg_standby_ips:
 %{ for ip in pg_standby_private_ips ~}

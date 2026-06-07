@@ -28,4 +28,5 @@
 - Keep cloud-specific behavior behind provider arguments and generated Terraform variables; avoid hardcoding AWS-only or GCP-only assumptions into shared paths.
 - Keep proxy behavior generic in shared paths. Proxy-specific behavior belongs in `ansible/roles/haproxy`, `ansible/roles/pgpool`, `ansible/roles/proxysql`, or `ansible/roles/pgcat`.
 - Keep two-proxy HA generic through `proxy_count`, `proxy_vip`, and the `keepalived` role. Do not make VRRP behavior specific to one proxy implementation.
+- Keep private and public proxy VIP behavior distinct: the private VIP feeds keepalived/VRRP, while `--proxy-public-vip` reserves a cloud static public IP.
 - When adding subcommand options, prefer explicit flags and test their generated config or command behavior.

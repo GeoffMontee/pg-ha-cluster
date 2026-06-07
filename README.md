@@ -56,7 +56,7 @@ This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP usi
     └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
-By default, the cluster has one proxy node. Set `--proxy-count 2 --proxy-vip <ip>` to deploy a second proxy and configure keepalived/VRRP between the proxy nodes.
+By default, the cluster has one proxy node. Set `--proxy-count 2` to deploy a second proxy and configure keepalived/VRRP between the proxy nodes. If you do not provide `--proxy-vip`, Terraform derives a private VRRP VIP from `--subnet-cidr`.
 
 ## Prerequisites
 
@@ -146,7 +146,9 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--existing-subnet ID_OR_SELF_LINK`: Existing AWS subnet ID or GCP subnetwork name/self link. Must be used with `--existing-vpc`.
 - `--proxy-type {haproxy,pgpool,proxysql,pgcat}`: PostgreSQL proxy implementation. Defaults to `haproxy`.
 - `--proxy-count {1,2}`: Number of proxy nodes. Defaults to `1`.
-- `--proxy-vip IP`: VRRP virtual IP for two-node proxy HA. Required when `--proxy-count 2`.
+- `--proxy-vip IP`: Explicit private VRRP virtual IP for two-node proxy HA. If omitted with `--proxy-count 2`, Terraform derives one from `--subnet-cidr`.
+- `--proxy-vip-hostnum N`: Host number inside `--subnet-cidr` for the automatically generated private proxy VIP. Defaults to `50`.
+- `--proxy-public-vip`: Reserve a static public IP for the proxy endpoint and attach it to the first proxy node.
 - `--pg-instance-type TYPE`: PostgreSQL node instance or machine type. Defaults are cloud-specific.
 - `--proxy-instance-type TYPE`: Proxy node instance or machine type. Defaults are cloud-specific.
 - `--postgres-version VERSION`: PostgreSQL major version to install. Defaults to `18`.
@@ -217,11 +219,20 @@ Deploy two proxy nodes with keepalived/VRRP:
 ```bash
 python3 deploy_pg_ha_cluster.py deploy \
   --provider aws \
-  --proxy-count 2 \
-  --proxy-vip 10.0.1.50
+  --proxy-count 2
 ```
 
-`--proxy-count 2` configures keepalived with unicast VRRP between the proxy nodes. AWS and GCP do not generally route an arbitrary floating IP by VRRP alone; the VIP must be valid for your network design and may require cloud-specific secondary IP, alias IP, route, or load-balancer configuration outside of keepalived.
+`--proxy-count 2` configures keepalived with unicast VRRP between the proxy nodes. When `--proxy-vip` is omitted, Terraform uses `cidrhost(--subnet-cidr, --proxy-vip-hostnum)` as the private VIP. With existing subnets, set `--subnet-cidr` to the actual subnet CIDR or pass an explicit `--proxy-vip`.
+
+Reserve a static public proxy IP:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy \
+  --provider aws \
+  --proxy-public-vip
+```
+
+`--proxy-public-vip` creates an AWS Elastic IP or GCP regional static address and attaches it to `proxy-1`. AWS and GCP do not generally route an arbitrary private floating IP by VRRP alone; the private VIP must be valid for your network design and may require cloud-specific secondary IP, alias IP, route, or load-balancer configuration outside of keepalived.
 
 Disable the local NVMe mount if you choose an instance type without local NVMe storage:
 
@@ -276,7 +287,7 @@ The selected proxy exposes:
 
 - Port `5432` for PostgreSQL client connections.
 - Optional proxy-specific read-only or admin ports listed in the proxy defaults above.
-- When `--proxy-vip` is set, Terraform connection output uses the VIP for `pg_proxy_port`.
+- Terraform outputs `pg_proxy_private_port` when a private VIP is configured and `pg_proxy_public_port` for the static public IP or first proxy public IP.
 
 ## Operations
 

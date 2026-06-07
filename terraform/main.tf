@@ -59,6 +59,9 @@ locals {
   proxy_pg_rw_port = local.proxy_client_ports_by_type[var.proxy_type][0]
   proxy_pg_ro_port = var.proxy_type == "haproxy" ? 5433 : 0
   proxy_admin_port = local.proxy_admin_ports_by_type[var.proxy_type][0]
+  proxy_private_vip = var.proxy_vip != "" ? var.proxy_vip : (
+    var.proxy_count == 2 ? cidrhost(var.public_subnet_cidr, var.proxy_vip_hostnum) : ""
+  )
 
   common_tags = var.owner == "" ? {} : {
     Owner = var.owner
@@ -94,6 +97,7 @@ locals {
   proxy_private_ips = local.deploy_aws ? aws_instance.proxy[*].private_ip : [
     for instance in google_compute_instance.proxy : instance.network_interface[0].network_ip
   ]
+  proxy_public_vip = local.deploy_aws ? try(aws_eip.proxy_public_vip[0].public_ip, "") : try(google_compute_address.proxy_public_vip[0].address, "")
 }
 
 data "aws_ami" "ubuntu" {
@@ -253,6 +257,15 @@ resource "aws_security_group" "proxy" {
   }, local.common_tags)
 }
 
+resource "aws_eip" "proxy_public_vip" {
+  count  = local.deploy_aws && var.create_proxy_public_vip ? 1 : 0
+  domain = "vpc"
+
+  tags = merge({
+    Name = "${var.project_name}-proxy-public-vip"
+  }, local.common_tags)
+}
+
 resource "google_compute_network" "pg_cluster" {
   count                   = local.deploy_gcp && var.create_network ? 1 : 0
   name                    = "${var.project_name}-vpc"
@@ -320,6 +333,12 @@ resource "google_compute_firewall" "proxy" {
 
   source_ranges = var.allowed_ssh_cidrs
   target_tags   = [local.gcp_proxy_tag]
+}
+
+resource "google_compute_address" "proxy_public_vip" {
+  count  = local.deploy_gcp && var.create_proxy_public_vip ? 1 : 0
+  name   = "${var.project_name}-proxy-public-vip"
+  region = var.gcp_region
 }
 
 resource "tls_private_key" "ssh" {
@@ -404,6 +423,12 @@ resource "aws_instance" "proxy" {
   }, local.common_tags)
 }
 
+resource "aws_eip_association" "proxy_public_vip" {
+  count         = local.deploy_aws && var.create_proxy_public_vip ? 1 : 0
+  allocation_id = aws_eip.proxy_public_vip[0].id
+  instance_id   = aws_instance.proxy[0].id
+}
+
 resource "google_compute_instance" "pg_primary" {
   count        = local.deploy_gcp ? 1 : 0
   name         = "${var.project_name}-pg-primary"
@@ -470,6 +495,7 @@ resource "google_compute_instance" "pg_standby" {
     subnetwork = local.gcp_subnetwork
 
     access_config {
+      nat_ip = count.index == 0 ? try(google_compute_address.proxy_public_vip[0].address, null) : null
     }
   }
 }
@@ -522,7 +548,8 @@ resource "local_file" "ansible_group_vars" {
     vpc_cidr               = var.vpc_cidr
     proxy_type             = var.proxy_type
     proxy_count            = var.proxy_count
-    proxy_vip              = var.proxy_vip
+    proxy_private_vip      = local.proxy_private_vip
+    proxy_public_vip       = local.proxy_public_vip
     proxy_pg_rw_port       = local.proxy_pg_rw_port
     proxy_pg_ro_port       = local.proxy_pg_ro_port
     proxy_admin_port       = local.proxy_admin_port

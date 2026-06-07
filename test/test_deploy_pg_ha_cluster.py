@@ -33,6 +33,8 @@ def test_deploy_defaults_generate_aws_tfvars(monkeypatch):
     assert tfvars["proxy_type"] == "haproxy"
     assert tfvars["proxy_count"] == 1
     assert tfvars["proxy_vip"] == ""
+    assert tfvars["proxy_vip_hostnum"] == 50
+    assert tfvars["create_proxy_public_vip"] is False
     assert tfvars["postgresql_version"] == "18"
     assert tfvars["create_network"] is True
     assert tfvars["enable_local_nvme"] is True
@@ -66,6 +68,9 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "2",
         "--proxy-vip",
         "10.20.1.50",
+        "--proxy-vip-hostnum",
+        "60",
+        "--proxy-public-vip",
         "--postgres-version",
         "17",
         "--no-local-nvme",
@@ -88,6 +93,8 @@ def test_deploy_overrides_network_postgres_version_and_instances():
     assert tfvars["proxy_type"] == "pgcat"
     assert tfvars["proxy_count"] == 2
     assert tfvars["proxy_vip"] == "10.20.1.50"
+    assert tfvars["proxy_vip_hostnum"] == 60
+    assert tfvars["create_proxy_public_vip"] is True
     assert tfvars["postgresql_version"] == "17"
     assert tfvars["enable_local_nvme"] is False
     assert tfvars["repmgr_password"] == "repmgr-secret"
@@ -102,11 +109,14 @@ def test_existing_network_requires_vpc_and_subnet():
         deploy_pg_ha_cluster.build_tfvars(args)
 
 
-def test_two_proxy_nodes_require_vip():
+def test_two_proxy_nodes_can_autogenerate_private_vip():
     args = parse_args("deploy", "--proxy-count", "2")
 
-    with pytest.raises(SystemExit, match="--proxy-vip is required"):
-        deploy_pg_ha_cluster.build_tfvars(args)
+    tfvars = deploy_pg_ha_cluster.build_tfvars(args)
+
+    assert tfvars["proxy_count"] == 2
+    assert tfvars["proxy_vip"] == ""
+    assert tfvars["proxy_vip_hostnum"] == 50
 
 
 @pytest.mark.parametrize("proxy_type", ["haproxy", "pgpool", "proxysql", "pgcat"])

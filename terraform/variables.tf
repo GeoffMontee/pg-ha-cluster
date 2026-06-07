@@ -117,7 +117,7 @@ variable "proxy_instance_type" {
 }
 
 variable "proxy_count" {
-  description = "Number of proxy nodes to deploy. Use 2 with proxy_vip to enable keepalived VRRP."
+  description = "Number of proxy nodes to deploy. Use 2 to enable keepalived VRRP with an explicit or generated private VIP."
   type        = number
   default     = 1
 
@@ -128,9 +128,21 @@ variable "proxy_count" {
 }
 
 variable "proxy_vip" {
-  description = "VRRP virtual IP for two-node proxy HA. Required when proxy_count is 2."
+  description = "Explicit private VRRP virtual IP for two-node proxy HA. If empty and proxy_count is 2, Terraform derives one from public_subnet_cidr."
   type        = string
   default     = ""
+}
+
+variable "proxy_vip_hostnum" {
+  description = "Host number inside public_subnet_cidr for the automatically generated private proxy VIP"
+  type        = number
+  default     = 50
+}
+
+variable "create_proxy_public_vip" {
+  description = "Reserve a static public IP and attach it to the first proxy node"
+  type        = bool
+  default     = false
 }
 
 variable "postgresql_version" {
