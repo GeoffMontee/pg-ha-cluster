@@ -27,20 +27,36 @@ This project deploys a PostgreSQL 18 high availability cluster on AWS or GCP usi
 
 ```
                     ┌─────────────────────────────────────────┐
-                    │          PostgreSQL Proxy               │
-                    │  HAProxy | pgpool-II | ProxySQL | PgCat │
-                    │  Port 5432 → PostgreSQL                 │
+                    │        Client / Application Traffic     │
                     └─────────────────┬───────────────────────┘
                                       │
-              ┌───────────────────────┼───────────────────────┐
-              │                       │                       │
-              ▼                       ▼                       ▼
-    ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-    │  PostgreSQL 18  │     │  PostgreSQL 18  │     │  PostgreSQL 18  │
-    │    PRIMARY      │────▶│   STANDBY 1     │     │   STANDBY 2     │
-    │   (repmgr)      │     │   (repmgr)      │◀────│   (repmgr)      │
-    └─────────────────┘     └─────────────────┘     └─────────────────┘
+                    ┌─────────────────▼───────────────────────┐
+                    │   Proxy endpoint                         │
+                    │   proxy-1, or VRRP VIP with proxy-1/2    │
+                    └────────────┬────────────────┬────────────┘
+                                 │                │
+                       ┌─────────▼─────────┐      │
+                       │      proxy-1      │      │ optional
+                       │ HAProxy | pgpool  │      │ proxy-2 with
+                       │ ProxySQL | PgCat  │      │ keepalived/VRRP
+                       └─────────┬─────────┘      │
+                                 │                │
+                       ┌─────────▼─────────┐      │
+                       │      proxy-2      │◀─────┘
+                       │ optional HA node  │
+                       └─────────┬─────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+    │  PostgreSQL 18  │ │  PostgreSQL 18  │ │  PostgreSQL 18  │
+    │    PRIMARY      │▶│   STANDBY 1     │ │   STANDBY 2     │
+    │   (repmgr)      │ │   (repmgr)      │◀│   (repmgr)      │
+    └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
+
+By default, the cluster has one proxy node. Set `--proxy-count 2 --proxy-vip <ip>` to deploy a second proxy and configure keepalived/VRRP between the proxy nodes.
 
 ## Prerequisites
 
