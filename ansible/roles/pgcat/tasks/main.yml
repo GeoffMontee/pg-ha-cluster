@@ -4,18 +4,47 @@
     name:
       - cargo
       - build-essential
+      - git
       - pkg-config
       - libssl-dev
     state: present
   become: true
 
-- name: Install PgCat with Cargo
-  ansible.builtin.command: cargo install {{ pgcat_package }} --root /usr/local
+- name: Clone PgCat source
+  ansible.builtin.git:
+    repo: "{{ pgcat_repo_url }}"
+    dest: "{{ pgcat_source_dir }}"
+    version: "{{ pgcat_repo_version }}"
+    update: yes
+  become: true
+  register: pgcat_source
+
+- name: Check PgCat binary
+  ansible.builtin.stat:
+    path: "{{ pgcat_binary }}"
+  register: pgcat_binary_stat
+
+- name: Build PgCat from source
+  ansible.builtin.command: cargo build --release
   args:
-    creates: "{{ pgcat_binary }}"
+    chdir: "{{ pgcat_source_dir }}"
   environment:
     CARGO_HOME: /usr/local/share/cargo
   become: true
+  register: pgcat_build
+  changed_when: true
+  when: pgcat_source.changed or not pgcat_binary_stat.stat.exists
+
+- name: Install PgCat binary
+  ansible.builtin.copy:
+    src: "{{ pgcat_source_dir }}/target/release/pgcat"
+    dest: "{{ pgcat_binary }}"
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  become: true
+  when: pgcat_build.changed
 
 - name: Create PgCat group
   ansible.builtin.group:

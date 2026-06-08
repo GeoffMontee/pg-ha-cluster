@@ -1,7 +1,9 @@
 ---
 pgcat_user: "pgcat"
 pgcat_group: "pgcat"
-pgcat_package: "pgcat"
+pgcat_repo_url: "https://github.com/postgresml/pgcat.git"
+pgcat_repo_version: "main"
+pgcat_source_dir: "/usr/local/src/pgcat"
 pgcat_config_dir: "/etc/pgcat"
 pgcat_config_file: "{{ pgcat_config_dir }}/pgcat.toml"
 pgcat_binary: "/usr/local/bin/pgcat"

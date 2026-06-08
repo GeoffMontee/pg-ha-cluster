@@ -248,7 +248,7 @@ Proxy-specific exposed ports:
 - `proxysql`: PostgreSQL proxy on `5432`, admin interface on `6032`.
 - `pgcat`: PostgreSQL proxy on `5432`, Prometheus/admin endpoint on `9930`.
 
-ProxySQL is installed from the target host's configured apt repositories. PgCat is installed with Cargo by the `pgcat` role.
+ProxySQL is installed from the target host's configured apt repositories. PgCat is cloned from `postgresml/pgcat` and built with Cargo by the `pgcat` role because PgCat is not published as a crates.io package.
 
 Deploy two proxy nodes with keepalived/VRRP:
 
