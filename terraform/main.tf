@@ -25,10 +25,10 @@ provider "aws" {
 }
 
 provider "google" {
-  project     = var.gcp_project_id
+  project     = var.cloud_provider == "gcp" ? var.gcp_project_id : "unused-project"
   region      = var.gcp_region
   zone        = var.gcp_zone
-  credentials = var.gcp_service_account_file != "" ? file(var.gcp_service_account_file) : null
+  credentials = var.cloud_provider == "gcp" && var.gcp_service_account_file != "" ? file(var.gcp_service_account_file) : null
 }
 
 locals {
@@ -71,7 +71,7 @@ locals {
   }
 
   common_labels = var.owner == "" ? {} : {
-    owner = substr(regexreplace(lower(var.owner), "[^a-z0-9_-]", "_"), 0, 63)
+    owner = substr(replace(lower(var.owner), "/[^a-z0-9_-]/", "_"), 0, 63)
   }
 
   aws_vpc_id            = var.create_network ? try(aws_vpc.pg_cluster[0].id, "") : var.existing_vpc_id
