@@ -179,6 +179,57 @@ def test_gcp_existing_network_maps_to_gcp_tfvars():
     assert tfvars["existing_gcp_subnetwork"] == "projects/pg-project/regions/us-east1/subnetworks/existing"
 
 
+def test_gcp_service_account_file_infers_project_id(tmp_path):
+    service_account_file = tmp_path / "service-account.json"
+    service_account_file.write_text('{"project_id": "service-account-project"}', encoding="utf-8")
+
+    args = parse_args(
+        "deploy",
+        "--provider",
+        "gcp",
+        "--gcp-service-account-file",
+        str(service_account_file),
+    )
+
+    tfvars = deploy_pg_ha_cluster.build_tfvars(args)
+
+    assert tfvars["gcp_project_id"] == "service-account-project"
+    assert tfvars["gcp_service_account_file"] == str(service_account_file.resolve())
+
+
+def test_gcp_service_account_file_allows_project_override(tmp_path):
+    service_account_file = tmp_path / "service-account.json"
+    service_account_file.write_text('{"project_id": "service-account-project"}', encoding="utf-8")
+
+    args = parse_args(
+        "deploy",
+        "--provider",
+        "gcp",
+        "--gcp-project-id",
+        "explicit-project",
+        "--gcp-service-account-file",
+        str(service_account_file),
+    )
+
+    tfvars = deploy_pg_ha_cluster.build_tfvars(args)
+
+    assert tfvars["gcp_project_id"] == "explicit-project"
+    assert tfvars["gcp_service_account_file"] == str(service_account_file.resolve())
+
+
+def test_gcp_service_account_file_must_exist():
+    args = parse_args(
+        "deploy",
+        "--provider",
+        "gcp",
+        "--gcp-service-account-file",
+        "/tmp/does-not-exist-service-account.json",
+    )
+
+    with pytest.raises(SystemExit, match="--gcp-service-account-file does not exist"):
+        deploy_pg_ha_cluster.build_tfvars(args)
+
+
 def test_show_and_destroy_options_parse():
     show_args = parse_args("show", "--skip-ansible-status")
     destroy_args = parse_args("destroy", "--no-auto-approve")

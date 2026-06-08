@@ -21,6 +21,12 @@ variable "gcp_project_id" {
   default     = ""
 }
 
+variable "gcp_service_account_file" {
+  description = "Path to a GCP service account JSON key file"
+  type        = string
+  default     = ""
+}
+
 variable "gcp_region" {
   description = "GCP region for the subnet"
   type        = string

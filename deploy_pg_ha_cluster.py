@@ -56,6 +56,30 @@ def password_value(args: argparse.Namespace, field: str) -> str:
     return generated_password()
 
 
+def service_account_file_path(path: str | None) -> str:
+    if not path:
+        return ""
+
+    service_account_file = Path(path).expanduser().resolve()
+    if not service_account_file.is_file():
+        raise SystemExit(f"--gcp-service-account-file does not exist: {service_account_file}")
+    return str(service_account_file)
+
+
+def gcp_project_id_value(args: argparse.Namespace, service_account_file: str) -> str:
+    if args.gcp_project_id:
+        return args.gcp_project_id
+    if not service_account_file:
+        return ""
+
+    try:
+        service_account = json.loads(Path(service_account_file).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"--gcp-service-account-file is not valid JSON: {service_account_file}") from exc
+
+    return service_account.get("project_id", "")
+
+
 def ensure_generated_dirs() -> None:
     (ANSIBLE_DIR / "inventory" / "group_vars").mkdir(parents=True, exist_ok=True)
 
@@ -63,6 +87,7 @@ def ensure_generated_dirs() -> None:
 def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
     if bool(args.existing_vpc) != bool(args.existing_subnet):
         raise SystemExit("--existing-vpc and --existing-subnet must be supplied together")
+    gcp_service_account_file = service_account_file_path(args.gcp_service_account_file)
 
     tfvars: dict[str, Any] = {
         "cloud_provider": args.provider,
@@ -104,9 +129,12 @@ def build_tfvars(args: argparse.Namespace) -> dict[str, Any]:
             tfvars["existing_vpc_id"] = args.existing_vpc
             tfvars["existing_subnet_id"] = args.existing_subnet
     else:
-        if not args.gcp_project_id:
+        gcp_project_id = gcp_project_id_value(args, gcp_service_account_file)
+        if not gcp_project_id:
             raise SystemExit("--gcp-project-id is required when --provider gcp")
-        tfvars["gcp_project_id"] = args.gcp_project_id
+        tfvars["gcp_project_id"] = gcp_project_id
+        if gcp_service_account_file:
+            tfvars["gcp_service_account_file"] = gcp_service_account_file
         tfvars["gcp_region"] = args.gcp_region
         tfvars["gcp_zone"] = args.gcp_zone
         if args.existing_vpc:
@@ -231,6 +259,7 @@ def add_deploy_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-local-nvme", action="store_true", help="Disable mounting local NVMe storage for PostgreSQL data")
     parser.add_argument("--aws-region", default="us-east-1", help="AWS region")
     parser.add_argument("--gcp-project-id", default=os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCLOUD_PROJECT"), help="GCP project ID")
+    parser.add_argument("--gcp-service-account-file", help="Path to a GCP service account JSON key file")
     parser.add_argument("--gcp-region", default="us-central1", help="GCP region")
     parser.add_argument("--gcp-zone", default="us-central1-a", help="GCP zone")
     parser.add_argument("--gcp-pg-local-ssd-count", type=int, default=1, help="Local SSD scratch disks per GCP PostgreSQL node")

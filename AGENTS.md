@@ -18,6 +18,7 @@
 - Document every user-facing CLI option when adding, removing, or renaming deploy script arguments.
 - Update examples whenever defaults change, especially cloud provider defaults, PostgreSQL version, instance types, networking behavior, or secret handling.
 - Treat generated Terraform variable files, Terraform state, SSH keys, and Ansible inventory as sensitive in documentation.
+- For GCP service account authentication, store only file paths in generated variables. Never copy JSON key contents into repo files.
 
 ## Subcommand Behavior
 

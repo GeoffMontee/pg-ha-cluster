@@ -160,6 +160,7 @@ python3 deploy_pg_ha_cluster.py deploy --provider aws --skip-ansible
 - `--no-local-nvme`: Disable local NVMe/local SSD mounting for PostgreSQL data.
 - `--aws-region REGION`: AWS region. Defaults to `us-east-1`.
 - `--gcp-project-id PROJECT`: GCP project ID. Required for GCP unless `GOOGLE_CLOUD_PROJECT` or `GCLOUD_PROJECT` is set.
+- `--gcp-service-account-file PATH`: Path to a GCP service account JSON key file. If `--gcp-project-id` is omitted, the script uses the file's `project_id`.
 - `--gcp-region REGION`: GCP region. Defaults to `us-central1`.
 - `--gcp-zone ZONE`: GCP zone. Defaults to `us-central1-a`.
 - `--gcp-pg-local-ssd-count COUNT`: Number of local SSD scratch disks per GCP PostgreSQL node. Defaults to `1`.
@@ -195,6 +196,19 @@ GCP defaults:
 - Proxy node: `c4-standard-16`
 - Bastion node: `e2-micro`
 - PostgreSQL data: one local SSD scratch disk per database node, mounted at `/var/lib/postgresql`
+
+Authenticate to GCP with a service account file:
+
+```bash
+python3 deploy_pg_ha_cluster.py deploy \
+  --provider gcp \
+  --gcp-service-account-file /path/to/service-account.json \
+  --gcp-region us-central1 \
+  --gcp-zone us-central1-a \
+  --allowed-cidr YOUR_IP/32
+```
+
+The script stores the absolute service account file path in `terraform/generated.auto.tfvars.json`. Terraform reads the JSON key file locally; the key contents are not copied into the generated variables file.
 
 Override instance types with:
 
@@ -380,6 +394,7 @@ pg-ha-cluster/
 
 - Restrict `--allowed-cidr` to trusted networks.
 - Treat `terraform/generated.auto.tfvars.json`, Terraform state, generated SSH keys, and generated Ansible inventory as sensitive.
+- Treat GCP service account JSON key files as secrets and do not commit them.
 - Use stronger secret handling, TLS, private subnets, and managed backups before using this for production traffic.
 - Review `ansible/roles/postgresql/templates/pg_hba.conf.j2` for your application access model.
 
