@@ -107,3 +107,22 @@
     port: "{{ pgcat_port }}"
     host: localhost
     timeout: 60
+  register: pgcat_ready
+  failed_when: false
+
+- name: Collect PgCat diagnostics when not ready
+  ansible.builtin.shell: |
+    systemctl status {{ pgcat_service }} --no-pager || true
+    echo "=== journalctl -u {{ pgcat_service }} ==="
+    journalctl -u {{ pgcat_service }} -n 120 --no-pager || true
+    echo "=== listening ports ==="
+    ss -ltnp | grep -E ':({{ pgcat_port }}|{{ pgcat_admin_port }})' || true
+  register: pgcat_diagnostics
+  changed_when: false
+  become: true
+  when: pgcat_ready.failed | default(false)
+
+- name: Fail if PgCat is not ready
+  ansible.builtin.fail:
+    msg: "{{ pgcat_diagnostics.stdout }}"
+  when: pgcat_ready.failed | default(false)
