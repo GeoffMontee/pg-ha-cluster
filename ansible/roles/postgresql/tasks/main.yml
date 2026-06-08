@@ -11,11 +11,20 @@
     state: present
     filename: pgdg
   become: true
+  register: postgresql_apt_repository
 
-- name: Update apt cache after adding PostgreSQL repo
+- name: Update apt cache after PostgreSQL repo changes
   ansible.builtin.apt:
     update_cache: yes
   become: true
+  when: postgresql_apt_repository.changed
+
+- name: Refresh apt cache when PostgreSQL repo is unchanged
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: "{{ postgresql_apt_cache_valid_time }}"
+  become: true
+  when: not postgresql_apt_repository.changed
 
 - name: Install PostgreSQL {{ postgresql_version }} and repmgr packages
   ansible.builtin.apt:

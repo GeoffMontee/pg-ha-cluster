@@ -55,16 +55,54 @@
     - local_nvme_mount_enabled | bool
   become: true
 
-- name: Mount local NVMe storage for PostgreSQL data
-  ansible.posix.mount:
+- name: Ensure local NVMe mount point exists
+  ansible.builtin.file:
     path: "{{ local_nvme_mount_point }}"
-    src: "{{ pg_local_nvme_device }}"
-    fstype: "{{ local_nvme_filesystem }}"
-    opts: defaults,noatime,nofail
-    state: mounted
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
   when:
     - "'pg_cluster' in group_names"
     - local_nvme_mount_enabled | bool
+  become: true
+
+- name: Get local NVMe filesystem UUID
+  ansible.builtin.command: "blkid -s UUID -o value {{ pg_local_nvme_device }}"
+  register: local_nvme_uuid
+  changed_when: false
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+  become: true
+
+- name: Persist local NVMe mount in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\S+\s+{{ local_nvme_mount_point }}\s+'
+    line: "UUID={{ local_nvme_uuid.stdout }} {{ local_nvme_mount_point }} {{ local_nvme_filesystem }} defaults,noatime,nofail 0 2"
+    state: present
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+  become: true
+
+- name: Check local NVMe mount status
+  ansible.builtin.command: "findmnt -n {{ local_nvme_mount_point }}"
+  register: local_nvme_mount_status
+  changed_when: false
+  failed_when: false
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+  become: true
+
+- name: Mount local NVMe storage for PostgreSQL data
+  ansible.builtin.command: "mount {{ local_nvme_mount_point }}"
+  when:
+    - "'pg_cluster' in group_names"
+    - local_nvme_mount_enabled | bool
+    - local_nvme_mount_status.rc != 0
   become: true
 
 - name: Set timezone
@@ -85,6 +123,7 @@
   ansible.builtin.command: swapoff -a
   become: true
   changed_when: false
+  when: "'pg_cluster' in group_names"
 
 - name: Remove swap from fstab
   ansible.builtin.lineinfile:
@@ -92,6 +131,7 @@
     regexp: '\sswap\s'
     state: absent
   become: true
+  when: "'pg_cluster' in group_names"
 
 - name: Configure sysctl for PostgreSQL
   ansible.builtin.sysctl:
