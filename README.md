@@ -185,7 +185,7 @@ By default, the Terraform configuration creates a VPC/network, a public proxy su
 
 AWS defaults:
 
-- PostgreSQL nodes: `i7ie.4xlarge`
+- PostgreSQL nodes: `i7i.4xlarge`
 - Proxy node: `c7i.4xlarge`
 - Bastion node: `t3.micro`
 - PostgreSQL data: local NVMe instance store mounted at `/var/lib/postgresql`
@@ -215,7 +215,7 @@ Override instance types with:
 ```bash
 python3 deploy_pg_ha_cluster.py deploy \
   --provider aws \
-  --pg-instance-type i7ie.8xlarge \
+  --pg-instance-type i7i.8xlarge \
   --proxy-instance-type c7i.8xlarge
 ```
 

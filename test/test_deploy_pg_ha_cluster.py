@@ -66,7 +66,7 @@ def test_deploy_overrides_network_postgres_version_and_instances():
         "--allowed-cidr",
         "198.51.100.0/24",
         "--pg-instance-type",
-        "i7ie.8xlarge",
+        "i7i.8xlarge",
         "--proxy-instance-type",
         "c7i.8xlarge",
         "--bastion-instance-type",
@@ -100,7 +100,7 @@ def test_deploy_overrides_network_postgres_version_and_instances():
     assert tfvars["public_db_nodes"] is True
     assert tfvars["create_bastion"] is True
     assert tfvars["allowed_ssh_cidrs"] == ["203.0.113.10/32", "198.51.100.0/24"]
-    assert tfvars["pg_instance_type"] == "i7ie.8xlarge"
+    assert tfvars["pg_instance_type"] == "i7i.8xlarge"
     assert tfvars["proxy_instance_type"] == "c7i.8xlarge"
     assert tfvars["bastion_instance_type"] == "t3.small"
     assert tfvars["proxy_type"] == "pgcat"

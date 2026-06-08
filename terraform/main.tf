@@ -35,7 +35,7 @@ locals {
   deploy_aws = var.cloud_provider == "aws"
   deploy_gcp = var.cloud_provider == "gcp"
 
-  default_pg_instance_type      = local.deploy_aws ? "i7ie.4xlarge" : "c4d-standard-16"
+  default_pg_instance_type      = local.deploy_aws ? "i7i.4xlarge" : "c4d-standard-16"
   default_proxy_instance_type   = local.deploy_aws ? "c7i.4xlarge" : "c4-standard-16"
   default_bastion_instance_type = local.deploy_aws ? "t3.micro" : "e2-micro"
 
