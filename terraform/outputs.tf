@@ -61,9 +61,9 @@ output "bastion_public_ip" {
 output "connection_info" {
   description = "Connection information"
   value = {
-    ssh_to_primary        = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_primary_public_ip}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_primary_private_ip}"
-    ssh_to_standby_1      = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[0]}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[0]}"
-    ssh_to_standby_2      = var.public_db_nodes ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[1]}" : "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[1]}"
+    ssh_to_primary        = local.ssh_jump_host != "" ? "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_primary_private_ip}" : "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_primary_public_ip}"
+    ssh_to_standby_1      = local.ssh_jump_host != "" ? "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[0]}" : "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[0]}"
+    ssh_to_standby_2      = local.ssh_jump_host != "" ? "ssh -i ${local_file.private_key.filename} -J ubuntu@${local.ssh_jump_host} ubuntu@${local.pg_standby_private_ips[1]}" : "ssh -i ${local_file.private_key.filename} ubuntu@${local.pg_standby_public_ips[1]}"
     ssh_to_proxy_1        = "ssh -i ${local_file.private_key.filename} ubuntu@${local.proxy_public_ips[0]}"
     ssh_to_proxy_2        = var.proxy_count == 2 ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.proxy_public_ips[1]}" : null
     ssh_to_bastion        = var.create_bastion ? "ssh -i ${local_file.private_key.filename} ubuntu@${local.bastion_public_ip}" : null

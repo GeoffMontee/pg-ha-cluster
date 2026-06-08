@@ -233,7 +233,7 @@ Create a bastion host:
 python3 deploy_pg_ha_cluster.py deploy --provider aws --create-bastion
 ```
 
-The bastion has a public IP and accepts SSH from `--allowed-cidr`. Terraform installs the generated SSH private key on the bastion so the `ubuntu` user can SSH passwordlessly to database and proxy nodes. When database nodes are private-only, the generated Ansible inventory connects through the bastion if present; otherwise it uses `proxy-1` as the SSH jump host.
+The bastion has a public IP and accepts SSH from `--allowed-cidr`. Terraform installs the generated SSH private key on the bastion so the `ubuntu` user can SSH passwordlessly to database and proxy nodes. When a bastion exists, the generated Ansible inventory connects to database nodes through the bastion using private IPs, even if `--public-db-nodes` is also set. Without a bastion, private-only database nodes use `proxy-1` as the SSH jump host.
 
 Select a proxy implementation with:
 

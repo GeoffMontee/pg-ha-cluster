@@ -109,9 +109,9 @@ locals {
   bastion_public_ip  = local.deploy_aws ? try(aws_instance.bastion[0].public_ip, "") : try(google_compute_instance.bastion[0].network_interface[0].access_config[0].nat_ip, "")
   bastion_private_ip = local.deploy_aws ? try(aws_instance.bastion[0].private_ip, "") : try(google_compute_instance.bastion[0].network_interface[0].network_ip, "")
 
-  ssh_jump_host            = var.public_db_nodes ? "" : (var.create_bastion ? local.bastion_public_ip : try(local.proxy_public_ips[0], ""))
-  pg_primary_ansible_host  = var.public_db_nodes ? local.pg_primary_public_ip : local.pg_primary_private_ip
-  pg_standby_ansible_hosts = var.public_db_nodes ? local.pg_standby_public_ips : local.pg_standby_private_ips
+  ssh_jump_host            = var.create_bastion ? local.bastion_public_ip : (var.public_db_nodes ? "" : try(local.proxy_public_ips[0], ""))
+  pg_primary_ansible_host  = local.ssh_jump_host != "" ? local.pg_primary_private_ip : local.pg_primary_public_ip
+  pg_standby_ansible_hosts = local.ssh_jump_host != "" ? local.pg_standby_private_ips : local.pg_standby_public_ips
 }
 
 data "aws_ami" "ubuntu" {
