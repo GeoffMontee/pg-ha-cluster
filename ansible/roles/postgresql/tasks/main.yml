@@ -7,7 +7,7 @@
 
 - name: Add PostgreSQL APT repository
   ansible.builtin.apt_repository:
-    repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_facts['distribution_release'] }}-pgdg main"
     state: present
     filename: pgdg
   become: true
@@ -17,12 +17,13 @@
     update_cache: yes
   become: true
 
-- name: Install PostgreSQL {{ postgresql_version }}
+- name: Install PostgreSQL {{ postgresql_version }} and repmgr packages
   ansible.builtin.apt:
     name:
       - "postgresql-{{ postgresql_version }}"
       - "postgresql-client-{{ postgresql_version }}"
       - "postgresql-contrib-{{ postgresql_version }}"
+      - "postgresql-{{ postgresql_version }}-repmgr"
     state: present
   become: true
 
@@ -98,4 +99,3 @@
   become: true
   changed_when: false
   when: inventory_hostname in groups['pg_primary']
-  ignore_errors: true

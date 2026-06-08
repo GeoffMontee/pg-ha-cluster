@@ -22,5 +22,5 @@ proxy-${i + 1} ansible_host=${ip} private_ip=${proxy_private_ips[i]} vrrp_priori
 
 %{ if bastion_ip != "" ~}
 [bastion]
-bastion ansible_host=${bastion_ip} private_ip=${bastion_private_ip}
+bastion-1 ansible_host=${bastion_ip} private_ip=${bastion_private_ip}
 %{ endif ~}

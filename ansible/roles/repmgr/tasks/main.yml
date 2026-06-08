@@ -1,10 +1,4 @@
 ---
-- name: Install repmgr for PostgreSQL {{ postgresql_version }}
-  ansible.builtin.apt:
-    name: "postgresql-{{ postgresql_version }}-repmgr"
-    state: present
-  become: true
-
 - name: Enable repmgr in shared_preload_libraries
   ansible.builtin.lineinfile:
     path: "{{ postgresql_config_dir }}/postgresql.conf"
