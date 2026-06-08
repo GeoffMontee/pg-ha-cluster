@@ -134,16 +134,24 @@
   when: "'pg_cluster' in group_names"
 
 - name: Configure sysctl for PostgreSQL
-  ansible.builtin.sysctl:
-    name: "{{ item.name }}"
-    value: "{{ item.value }}"
-    sysctl_set: yes
-    state: present
-    reload: yes
-  loop:
-    - { name: 'vm.swappiness', value: '1' }
-    - { name: 'vm.overcommit_memory', value: '2' }
-    - { name: 'net.core.somaxconn', value: '65535' }
-    - { name: 'net.ipv4.tcp_max_syn_backlog', value: '65535' }
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-postgresql-ha.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      vm.swappiness = 1
+      vm.overcommit_memory = 2
+      net.core.somaxconn = 65535
+      net.ipv4.tcp_max_syn_backlog = 65535
+  register: postgresql_sysctl_config
   become: true
   when: "'pg_cluster' in group_names"
+
+- name: Apply PostgreSQL sysctl settings
+  ansible.builtin.command: sysctl --system
+  become: true
+  changed_when: postgresql_sysctl_config.changed
+  when:
+    - "'pg_cluster' in group_names"
+    - postgresql_sysctl_config.changed
