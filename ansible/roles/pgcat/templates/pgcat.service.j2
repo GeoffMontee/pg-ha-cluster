@@ -7,7 +7,8 @@ Wants=network-online.target
 Type=simple
 User={{ pgcat_user }}
 Group={{ pgcat_group }}
-ExecStart={{ pgcat_binary }} {{ pgcat_config_file }}
+Environment=RUST_LOG=info
+ExecStart={{ pgcat_binary }} --config {{ pgcat_config_file }}
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65535

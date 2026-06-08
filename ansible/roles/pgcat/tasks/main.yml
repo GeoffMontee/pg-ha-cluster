@@ -99,6 +99,9 @@
     daemon_reload: yes
   become: true
 
+- name: Apply PgCat service or config changes
+  ansible.builtin.meta: flush_handlers
+
 - name: Wait for PgCat to be ready
   ansible.builtin.wait_for:
     port: "{{ pgcat_port }}"
